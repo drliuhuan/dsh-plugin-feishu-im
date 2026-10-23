@@ -48,6 +48,60 @@ const PENDING_TTL_MS = 15 * 60 * 1000
 
 const PLUGIN_NAME = 'dsh-plugin-feishu-im'
 
+/**
+ * The tool registry validates raw JSON Schema, while the ergonomic definition
+ * style marks required fields on each property. Fold `required: true` into the
+ * object-level `required` array.
+ */
+/**
+ * A provider rejects the whole request when one exposed tool schema is malformed,
+ * so nothing is registered unless it survived normalization cleanly.
+ */
+function isSafeSchemaNode(node) {
+  if (node === null || typeof node !== 'object' || Array.isArray(node)) return true
+  if (node.required !== undefined && !Array.isArray(node.required)) return false
+  for (const [key, value] of Object.entries(node)) {
+    if (value === null || typeof value !== 'object') continue
+    if (Array.isArray(value)) {
+      if (!value.every((item) => isSafeSchemaNode(item))) return false
+      continue
+    }
+    if (key === 'properties' && (value === null || typeof value !== 'object' || Array.isArray(value))) return false
+    if (!isSafeSchemaNode(value)) return false
+  }
+  return true
+}
+
+function isProviderSafeSchema(node) {
+  return node !== null && typeof node === 'object' && node.type === 'object' && isSafeSchemaNode(node)
+}
+
+function normalizeToolSchema(node) {
+  if (node === null || typeof node !== 'object' || Array.isArray(node)) return node
+  const copy = {}
+  for (const [key, value] of Object.entries(node)) {
+    if (key === 'required') continue
+    if (key === 'properties' && value && typeof value === 'object') {
+      const properties = {}
+      const required = []
+      for (const [name, child] of Object.entries(value)) {
+        if (child && typeof child === 'object' && child.required === true) required.push(name)
+        properties[name] = normalizeToolSchema(child)
+      }
+      copy.properties = properties
+      if (required.length > 0) copy.required = required
+      continue
+    }
+    if (key === 'items') {
+      copy.items = normalizeToolSchema(value)
+      continue
+    }
+    copy[key] = value
+  }
+  return copy
+}
+
+
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -422,82 +476,96 @@ export function apply(ctx) {
   ctx.inject(['tools'], (scope) => {
     if (typeof scope.tools?.register !== 'function') return
     try {
-      scope.effect(() => scope.tools.register({
-      name: 'feishu_sessions',
-      description: [
-        'List or switch the DSH session bound to this Feishu chat.',
-        'Use it when the user asks which conversations exist, or wants to continue in another one.',
-        'Switching takes effect for the NEXT message; the current turn stays in the current session.',
-      ].join(' '),
-      parameters: {
-        action: {
-          type: 'string',
-          required: true,
-          enum: ['list', 'current', 'switch'],
-          description: 'list (with optional query) / current / switch (needs ref)',
-        },
-        query: { type: 'string', description: 'Case-insensitive filter for action=list.' },
-        ref: {
-          type: 'string',
-          description: 'For action=switch: the 1-based number from the last list, a session id/prefix, or a title fragment.',
-        },
-      },
-      output: {
-        schema: {
+      const definition = {
+        name: 'feishu_sessions',
+        description: [
+          'List or switch the DSH session bound to this Feishu chat.',
+          'Use it when the user asks which conversations exist, or wants to continue in another one.',
+          'Switching takes effect for the NEXT message; the current turn stays in the current session.',
+        ].join(' '),
+        // A full JSON Schema: this registry hands `parameters` to the model as-is,
+        // so a bare property map would arrive without `type: "object"` and the
+        // provider would reject the whole request.
+        parameters: normalizeToolSchema({
           type: 'object',
           additionalProperties: false,
           properties: {
-            message: { type: 'string', required: true },
-            sessions: {
-              type: 'array',
-              items: {
-                type: 'object',
-                additionalProperties: false,
-                properties: {
-                  index: { type: 'number', required: true },
-                  label: { type: 'string', required: true },
-                  sessionId: { type: 'string', required: true },
-                  running: { type: 'boolean', required: true },
+            action: {
+              type: 'string',
+              required: true,
+              enum: ['list', 'current', 'switch'],
+              description: 'list (with optional query) / current / switch (needs ref)',
+            },
+            query: { type: 'string', description: 'Case-insensitive filter for action=list.' },
+            ref: {
+              type: 'string',
+              description: 'For action=switch: the 1-based number from the last list, a session id/prefix, or a title fragment.',
+            },
+          },
+        }),
+        output: {
+          schema: normalizeToolSchema({
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              message: { type: 'string', required: true },
+              sessions: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  additionalProperties: false,
+                  properties: {
+                    index: { type: 'number', required: true },
+                    label: { type: 'string', required: true },
+                    sessionId: { type: 'string', required: true },
+                    running: { type: 'boolean', required: true },
+                  },
                 },
               },
             },
-          },
+          }),
+          // The model-facing projection: one text block is enough for a picker.
+          render: (_args, value) => [{ type: 'text', text: String(value?.message || '') }],
         },
-        // The model-facing projection: one text block is enough for a picker.
-        render: (_args, value) => [{ type: 'text', text: String(value?.message || '') }],
-      },
-      execute: async (args, exec) => {
-        const action = String(args?.action || 'list')
-        const sessionId = String(exec?.agent?.session?.id || exec?.agent?.id || '')
-        const bound = sessionId ? await sessions.chatOfSession(sessionId) : undefined
-        if (!bound) {
-          return { message: '这个会话没有绑定飞书对话，只能在飞书发起的会话里用。' }
-        }
-        if (action === 'current') {
-          const currentId = await sessions.current(bound.chatId)
-          if (!currentId) return { message: '这个对话还没有绑定会话。' }
-          const rows = await sessions.list({ limit: 50 })
-          const label = rows.find((entry) => entry.sessionId === currentId)?.label || String(currentId)
-          return { message: `当前绑定：${label}` }
-        }
-        if (action === 'switch') {
-          const row = await sessions.resolve(bound.chatId, String(args?.ref || ''))
-          await sessions.switchTo(bound.chatId, row)
-          return { message: `已切换到「${row.label}」；下一条消息会进这个会话。` }
-        }
-        const rows = await sessions.list({ query: String(args?.query || ''), limit: 10 })
-        sessions.remember(bound.chatId, rows)
-        return {
-          message: sessions.format(rows, await sessions.current(bound.chatId)),
-          sessions: rows.map((row, index) => ({
-            index: index + 1,
-            label: row.label,
-            sessionId: row.sessionId,
-            running: Boolean(row.running),
-          })),
-        }
+        execute: async (args, exec) => {
+          const action = String(args?.action || 'list')
+          const sessionId = String(exec?.agent?.session?.id || exec?.agent?.id || '')
+          const bound = sessionId ? await sessions.chatOfSession(sessionId) : undefined
+          if (!bound) {
+            return { message: '这个会话没有绑定飞书对话，只能在飞书发起的会话里用。' }
+          }
+          if (action === 'current') {
+            const currentId = await sessions.current(bound.chatId)
+            if (!currentId) return { message: '这个对话还没有绑定会话。' }
+            const rows = await sessions.list({ limit: 50 })
+            const label = rows.find((entry) => entry.sessionId === currentId)?.label || String(currentId)
+            return { message: `当前绑定：${label}` }
+          }
+          if (action === 'switch') {
+            const row = await sessions.resolve(bound.chatId, String(args?.ref || ''))
+            await sessions.switchTo(bound.chatId, row)
+            return { message: `已切换到「${row.label}」；下一条消息会进这个会话。` }
+          }
+          const rows = await sessions.list({ query: String(args?.query || ''), limit: 10 })
+          sessions.remember(bound.chatId, rows)
+          return {
+            message: sessions.format(rows, await sessions.current(bound.chatId)),
+            sessions: rows.map((row, index) => ({
+              index: index + 1,
+              label: row.label,
+              sessionId: row.sessionId,
+              running: Boolean(row.running),
+            })),
+          }
         },
-      }), `${PLUGIN_NAME}: feishu_sessions tool`)
+      }
+      if (!isProviderSafeSchema(definition.parameters)) {
+        throw new Error('feishu_sessions parameters are not a provider-safe JSON Schema')
+      }
+      if (!isProviderSafeSchema(definition.output.schema)) {
+        throw new Error('feishu_sessions output schema is not a provider-safe JSON Schema')
+      }
+      scope.effect(() => scope.tools.register(definition), `${PLUGIN_NAME}: feishu_sessions tool`)
       probe('tool-registered', { name: 'feishu_sessions' })
     } catch (error) {
       probe('tool-failed', { message: String((error && error.message) || error) })
