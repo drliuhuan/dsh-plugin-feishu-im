@@ -337,6 +337,19 @@ export function apply(ctx) {
       if (body.allowedOpenIds !== undefined) next.allowedOpenIds = asStringList(body.allowedOpenIds)
       if (body.allowCommands !== undefined) next.allowCommands = body.allowCommands !== false
       if (body.answerMode !== undefined) next.answerMode = body.answerMode === 'both' ? 'both' : 'feishu'
+      if (body.sessionCwd !== undefined) {
+        const cwd = asString(body.sessionCwd)
+        if (!cwd) throw new Error('工作文件夹不能为空')
+        const expanded = cwd.startsWith('~') ? cwd : (cwd.startsWith('/') ? cwd : '')
+        if (!expanded) throw new Error('工作文件夹需要是绝对路径，或以 ~/ 开头')
+        next.sessionCwd = cwd
+      }
+      if (body.workspaceTitle !== undefined) {
+        const title = asString(body.workspaceTitle)
+        if (!title) throw new Error('工作区名称不能为空')
+        if (title.length > 60) throw new Error('工作区名称最长 60 个字符')
+        next.workspaceTitle = title
+      }
       if (body.answerTimeoutMinutes !== undefined) {
         const minutes = Number(body.answerTimeoutMinutes)
         if (!Number.isFinite(minutes) || minutes < 0 || minutes > 120) throw new Error('等待上限需要是 0–120 之间的分钟数')

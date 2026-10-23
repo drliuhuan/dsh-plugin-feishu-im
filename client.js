@@ -13,7 +13,7 @@
   var API = '/api/feishu-im';
   // Bumped on every installed build: the page prints it, so a stale artifact is
   // visible instead of being mistaken for a code bug.
-  var BUILD = '1.8.7';
+  var BUILD = '1.9.2';
 
   var CSS = [
     '.fsim-page{display:flex;flex-direction:column;gap:20px;max-width:760px;color:var(--dsw-alias-label-primary,#1a1a1a);}',
@@ -366,6 +366,12 @@
       var allowDraftState = useState((state.allowedOpenIds || []).join('\n'));
       var allowDraft = allowDraftState[0];
       var setAllowDraft = allowDraftState[1];
+      var cwdDraftState = useState(state.sessionCwd || '~/dsh-plugin-feishu-im');
+      var cwdDraft = cwdDraftState[0];
+      var setCwdDraft = cwdDraftState[1];
+      var wsTitleDraftState = useState(state.workspaceTitle || '飞书IM');
+      var wsTitleDraft = wsTitleDraftState[0];
+      var setWsTitleDraft = wsTitleDraftState[1];
       var timeoutDraftState = useState(String(state.answerTimeoutMinutes || 5));
       var timeoutDraft = timeoutDraftState[0];
       var setTimeoutDraft = timeoutDraftState[1];
@@ -378,6 +384,14 @@
       useEffect(function () {
         setTimeoutDraft(String(state.answerTimeoutMinutes || 5));
       }, [state.answerTimeoutMinutes]);
+
+      useEffect(function () {
+        setCwdDraft(state.sessionCwd || '~/dsh-plugin-feishu-im');
+      }, [state.sessionCwd]);
+
+      useEffect(function () {
+        setWsTitleDraft(state.workspaceTitle || '飞书IM');
+      }, [state.workspaceTitle]);
 
       function run(key, task, success) {
         setBusy(key);
@@ -451,6 +465,36 @@
             h(Switch, { label: '授权通知', checked: state.notify.approval, onChange: function () { toggleNotify('approval'); } })),
           h(Row, { label: '需要你回答', hint: 'DSH 向你提问时，问题会变成可选按钮。' },
             h(Switch, { label: '提问通知', checked: state.notify.question, onChange: function () { toggleNotify('question'); } }))),
+
+        h(Card, { title: '飞书会话的位置' },
+          h('p', { className: 'fsim-sub' },
+            '在飞书里发起的对话会新建在下面这个文件夹，并在工作区列表里归到同一个名字下。'),
+          h(Field, {
+            label: '工作文件夹',
+            hint: '绝对路径或以 ~/ 开头；不存在会自动创建。默认 ~/dsh-plugin-feishu-im。',
+          },
+            h('input', {
+              className: 'fsim-input',
+              value: cwdDraft,
+              placeholder: '~/dsh-plugin-feishu-im',
+              onChange: function (event) { setCwdDraft(event.target.value); },
+              onBlur: function () {
+                if (cwdDraft !== state.sessionCwd) savePrefs({ sessionCwd: cwdDraft });
+              },
+            })),
+          h(Field, {
+            label: '工作区名称',
+            hint: '工作区里显示的分组名，默认「飞书IM」。改名会在下一次新建对话时同步。',
+          },
+            h('input', {
+              className: 'fsim-input',
+              value: wsTitleDraft,
+              placeholder: '飞书IM',
+              onChange: function (event) { setWsTitleDraft(event.target.value); },
+              onBlur: function () {
+                if (wsTitleDraft !== state.workspaceTitle) savePrefs({ workspaceTitle: wsTitleDraft });
+              },
+            }))),
 
         h(Card, { title: '指挥与安全' },
           h(Row, { label: '允许在飞书里指挥 DSH', hint: '关闭后，飞书只用来接收通知，收到的消息不会变成对话。' },

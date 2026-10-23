@@ -22,6 +22,7 @@ A Feishu (Lark) IM channel for DeepSeek Harness: create a dedicated Feishu bot b
 | Progress | A `Typing` reaction on your message while working, `CrossMark` on failure |
 | Control | Send a message in Feishu → it runs in a DSH session → the result comes back to the same chat |
 | Sessions | `/sessions` lists them, tap a number to switch, or `/resume <n\|id\|title>` |
+| Where they live | New conversations go to a configurable folder (default `~/dsh-plugin-feishu-im`) under a configurable workspace title (default 飞书IM) |
 | Rendering | Sent as **Card JSON 2.0**: headings, quotes, code blocks and tables render; long output paginates instead of being cut |
 
 ## Install
@@ -125,6 +126,16 @@ sessions are filtered out and the current binding is marked `← current`.
 
 The model can do it too: the `feishu_sessions` tool (`list` / `current` / `switch`) lets the agent list or switch the
 session bound to this chat, so “switch to the third session” works as plain language.
+
+### Where a Feishu conversation lives
+
+The **Feishu session location** settings control two things:
+
+- **Working folder** — defaults to `~/dsh-plugin-feishu-im` and is created when missing;
+- **Workspace title** — defaults to 飞书IM and groups these sessions in the workspace list; a rename is applied to the
+  existing workspace when the next Feishu conversation is created.
+
+Existing conversations keep their folder; send `/new` to start one in the new location.
 
 ## Security model
 

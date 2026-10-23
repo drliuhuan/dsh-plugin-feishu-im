@@ -33,11 +33,30 @@ const summaries = [
   },
 ]
 
+// Workspace registry double: `create` reuses a record and keeps its title unless
+// `setTitle` is called, exactly like the real service.
+const created = []
 const ctx = {
   get: (name) => {
     // Mirrors the live service: the list is wrapped, not a bare array.
     if (name === 'sessionController') return { list: async () => ({ items: summaries }) }
-    if (name === 'workspaceRegistry') return { list: () => [{ path: '/home/me/work/alpha', title: '工作区 Alpha' }] }
+    if (name === 'workspaceRegistry') {
+      return {
+        list: () => [{ path: '/home/me/work/alpha', title: '工作区 Alpha' }],
+        create: async (path, title) => {
+          created.push({ path, title })
+          const existing = created.find((entry) => entry.path === path && entry.workspace)
+          if (existing) return existing.workspace
+          const workspace = {
+            path,
+            title: title || path.split('/').pop(),
+            setTitle: async (next) => { workspace.title = next },
+          }
+          created[created.length - 1].workspace = workspace
+          return workspace
+        },
+      }
+    }
     return undefined
   },
 }
@@ -75,5 +94,20 @@ assert.equal(await sessions.chatOfSession('session-unknown'), undefined)
 
 const afterSwitch = sessions.format(rows, await sessions.current('oc_test'))
 assert.match(afterSwitch, /2\. \*\*修 CI 流水线\*\* ←当前/, 'the current marker follows the binding')
+
+// Workspace provisioning: created with the configured title, retitled when the
+// setting changes, and a no-op when it already matches.
+const first = await sessions.ensureWorkspace('/home/me/feishu', '飞书IM')
+assert.equal(created.at(-1).path, '/home/me/feishu')
+assert.equal(first.title, '飞书IM')
+await sessions.ensureWorkspace('/home/me/feishu', '飞书 IM 工作区')
+assert.equal(first.title, '飞书 IM 工作区')
+const before = created.length
+await sessions.ensureWorkspace('/home/me/feishu', '飞书 IM 工作区')
+assert.equal(created.length, before + 1, 'still one registry call, but no redundant retitle')
+
+// Home expansion for the configured folder.
+assert.equal(sessions.expandHome('~/dsh-plugin-feishu-im').endsWith('/dsh-plugin-feishu-im'), true)
+assert.equal(sessions.expandHome('/abs/path'), '/abs/path')
 
 console.log('sessions smoke: all cases passed')
