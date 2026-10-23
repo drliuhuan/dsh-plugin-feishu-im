@@ -1,0 +1,34 @@
+name: release
+
+# Publishing here does not use an NPM_TOKEN: the package is bound to this
+# workflow through a trusted publisher (OIDC), so npm verifies the identity of
+# the run instead of a long-lived secret.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # required for OIDC / provenance
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: 'https://registry.npmjs.org'
+
+      # OIDC publishing and `npm trust` need npm >= 11.5; Node 22 ships 10.x.
+      - name: Upgrade npm
+        run: npm install -g npm@latest
+
+      - name: Test
+        run: npm test
+
+      - name: Publish
+        run: npm publish --provenance --access public
