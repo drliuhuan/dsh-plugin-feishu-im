@@ -678,8 +678,8 @@ export function apply(ctx) {
         name: 'feishu_permission',
         description: [
           'Read or REQUEST a change of the DSH session permission mode for this Feishu chat.',
-          'A request posts a confirmation card and blocks until the operator allows or rejects it;',
-          'the mode never changes without that approval.',
+          'A request posts a card with all four modes; the operator picks one and then confirms on a second card.',
+          'The mode never changes without that confirmation, and the call blocks until it happens.',
           'Modes: readonly (sandbox read-only), workspace (workspace read-write),',
           'auto (plugin reviews approvals in the workspace), full (danger-full-access, no prompts).',
         ].join(' '),
@@ -696,7 +696,7 @@ export function apply(ctx) {
             mode: {
               type: 'string',
               enum: ['readonly', 'workspace', 'auto', 'full'],
-              description: 'Target mode for action=request.',
+              description: 'Suggested target for action=request; the operator still picks and confirms.',
             },
             reason: { type: 'string', description: 'Why the change is needed; shown on the confirmation card.' },
           },
@@ -730,20 +730,24 @@ export function apply(ctx) {
               sandbox: PERMISSION_MODES[mode].sandbox,
             }
           }
-          const target = String(args?.mode || '')
-          if (!PERMISSION_MODES[target]) return { message: `未知的权限模式：${target || '(空)'}`, ok: false }
+          const suggested = String(args?.mode || '')
+          if (suggested && !PERMISSION_MODES[suggested]) {
+            return { message: `未知的权限模式：${suggested}`, ok: false }
+          }
           const reply = await answers.requestPermissionChange({
             chatId: bound.chatId,
-            mode: target,
-            label: `${PERMISSION_MODES[mode].label} → ${PERMISSION_MODES[target].label}`,
+            mode: suggested || undefined,
+            reason: String(args?.reason || ''),
+            label: PERMISSION_MODES[mode].label,
           })
           if (!reply.ok) return { message: reply.error, ok: false }
+          const applied = PERMISSION_MODES[reply.mode]
           return {
-            message: `已征得同意，权限切到「${PERMISSION_MODES[target].label}」。`,
+            message: `已征得同意，权限切到「${applied.label}」：${applied.hint}`,
             ok: true,
-            mode: target,
-            label: PERMISSION_MODES[target].label,
-            sandbox: PERMISSION_MODES[target].sandbox,
+            mode: reply.mode,
+            label: applied.label,
+            sandbox: applied.sandbox,
           }
         },
       }

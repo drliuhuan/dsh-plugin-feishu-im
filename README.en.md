@@ -169,6 +169,10 @@ Every Feishu chat stores its own permission mode, applied to the session it is b
 | Auto review (plugin) | `workspace-write` | plugin decides | The plugin approves workspace-level requests itself; **anything asking for full access still asks you** |
 | Full access | `danger-full-access` | never | No sandbox, no prompts |
 
+**Switching takes two cards**: `/permission` (or the agent, through the `feishu_permission` tool) posts the four
+modes; tapping one opens a **confirmation** card showing “from X → to Y”, and only 确认修改 applies it — 取消 changes
+nothing. An unanswered confirmation turns into “⏱ timed out” and the mode stays put.
+
 Under the hood the sandbox is a session-level `sandbox/mode` event, the approval side is `approval.setPolicy`, and `auto` deliberately keeps `ask` so the plugin can decide (it posts “🤖 auto-approved …” when it does). Settings sets the default for new sessions; `/permission` overrides one chat.
 
 ## Security model
