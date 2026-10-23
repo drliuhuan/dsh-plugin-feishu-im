@@ -22,6 +22,7 @@ import {
   getTenantToken,
   sendCard,
   sendMessage,
+  updateCard,
   getBotInfo,
   normalizeDomain,
   registrationBegin,
@@ -431,6 +432,10 @@ export function apply(ctx) {
     captures,
     sessions,
     onTextAnswer: (chatId, text) => answers.submitText(chatId, text),
+    updateCardMessage: async (messageId, card) => {
+      const state = await readState()
+      return updateCard(state, messageId, card)
+    },
     postCard: async (chatId, card) => {
       const state = await readState()
       const token = await getTenantToken(state.appId, state.appSecret, state.domain)
