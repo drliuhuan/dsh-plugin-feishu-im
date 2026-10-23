@@ -39,7 +39,7 @@ import { createCaptureStore } from './lib/captures.js'
 import { createInbound } from './lib/inbound.js'
 import { createSessions } from './lib/sessions.js'
 import { createLabels } from './lib/labels.js'
-import { createPermissions } from './lib/permissions.js'
+import { createPermissions, PERMISSION_MODES } from './lib/permissions.js'
 import { createRestart } from './lib/restart.js'
 import * as service from './lib/service.js'
 import { createNotifier } from './lib/notify.js'
@@ -669,6 +669,90 @@ export function apply(ctx) {
           }
         },
       }
+      /*
+       * Permission changes requested by the agent. The tool never switches the
+       * mode itself: it posts a confirmation card and only applies the change
+       * after an allowlisted operator taps 允许.
+       */
+      const permissionDefinition = {
+        name: 'feishu_permission',
+        description: [
+          'Read or REQUEST a change of the DSH session permission mode for this Feishu chat.',
+          'A request posts a confirmation card and blocks until the operator allows or rejects it;',
+          'the mode never changes without that approval.',
+          'Modes: readonly (sandbox read-only), workspace (workspace read-write),',
+          'auto (plugin reviews approvals in the workspace), full (danger-full-access, no prompts).',
+        ].join(' '),
+        parameters: normalizeToolSchema({
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            action: {
+              type: 'string',
+              required: true,
+              enum: ['current', 'request'],
+              description: 'current reads the mode; request asks the operator to switch it (needs mode).',
+            },
+            mode: {
+              type: 'string',
+              enum: ['readonly', 'workspace', 'auto', 'full'],
+              description: 'Target mode for action=request.',
+            },
+            reason: { type: 'string', description: 'Why the change is needed; shown on the confirmation card.' },
+          },
+        }),
+        output: {
+          schema: normalizeToolSchema({
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              message: { type: 'string', required: true },
+              ok: { type: 'boolean' },
+              mode: { type: 'string' },
+              label: { type: 'string' },
+              sandbox: { type: 'string' },
+            },
+          }),
+          render: (result) => result?.message || '权限请求已处理',
+        },
+        execute: async (args, exec) => {
+          const sessionId = String(exec?.agent?.session?.id || exec?.agent?.id || '')
+          const bound = sessionId ? await sessions.chatOfSession(sessionId) : undefined
+          if (!bound) return { message: '这个会话没有绑定飞书对话，只能在飞书发起的会话里用。', ok: false }
+          const state = await readState()
+          const mode = permissions.modeOf(state, bound.chatId)
+          if (String(args?.action || 'current') === 'current') {
+            return {
+              message: `当前权限：${PERMISSION_MODES[mode].label}（沙箱 ${PERMISSION_MODES[mode].sandbox}）。${PERMISSION_MODES[mode].hint}`,
+              ok: true,
+              mode,
+              label: PERMISSION_MODES[mode].label,
+              sandbox: PERMISSION_MODES[mode].sandbox,
+            }
+          }
+          const target = String(args?.mode || '')
+          if (!PERMISSION_MODES[target]) return { message: `未知的权限模式：${target || '(空)'}`, ok: false }
+          const reply = await answers.requestPermissionChange({
+            chatId: bound.chatId,
+            mode: target,
+            label: `${PERMISSION_MODES[mode].label} → ${PERMISSION_MODES[target].label}`,
+          })
+          if (!reply.ok) return { message: reply.error, ok: false }
+          return {
+            message: `已征得同意，权限切到「${PERMISSION_MODES[target].label}」。`,
+            ok: true,
+            mode: target,
+            label: PERMISSION_MODES[target].label,
+            sandbox: PERMISSION_MODES[target].sandbox,
+          }
+        },
+      }
+      if (!isProviderSafeSchema(permissionDefinition.parameters)) {
+        throw new Error('feishu_permission parameters are not a provider-safe JSON Schema')
+      }
+      scope.effect(() => scope.tools.register(permissionDefinition), `${PLUGIN_NAME}: feishu_permission tool`)
+      probe('tool-registered', { name: 'feishu_permission' })
+
       if (!isProviderSafeSchema(definition.parameters)) {
         throw new Error('feishu_sessions parameters are not a provider-safe JSON Schema')
       }

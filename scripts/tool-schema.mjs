@@ -13,10 +13,10 @@ process.env.DSH_HOME = process.env.DSH_HOME || '/tmp/fsim-tool-schema'
 
 const { apply } = await import('../index.js')
 
-let registered = null
+const registered = new Map()
 const scope = {
   effect(fn) { const dispose = fn(); return () => { if (typeof dispose === 'function') dispose() } },
-  tools: { register(definition) { registered = definition; return () => {} } },
+  tools: { register(definition) { registered.set(definition.name, definition); return () => {} } },
 }
 const ctx = {
   logger: { warn: (message) => console.log('[warn]', message) },
@@ -31,10 +31,10 @@ const ctx = {
 apply(ctx)
 await new Promise((resolve) => setTimeout(resolve, 300))
 
-assert.ok(registered, 'feishu_sessions was not registered (the plugin caught a schema problem)')
-assert.equal(registered.name, 'feishu_sessions')
+assert.ok(registered.has('feishu_sessions'), 'feishu_sessions was not registered (schema problem caught)')
+assert.ok(registered.has('feishu_permission'), 'feishu_permission was not registered (schema problem caught)')
 
-const parameters = registered.parameters
+const parameters = registered.get('feishu_sessions').parameters
 assert.equal(parameters.type, 'object', 'parameters must be a JSON Schema object')
 assert.equal(parameters.additionalProperties, false)
 assert.ok(parameters.properties?.action, 'action parameter is declared')
@@ -53,11 +53,24 @@ function assertNoPropertyRequired(node, path = '$') {
   for (const [key, value] of Object.entries(node)) assertNoPropertyRequired(value, `${path}.${key}`)
 }
 assertNoPropertyRequired(parameters)
-assertNoPropertyRequired(registered.output.schema)
+assertNoPropertyRequired(registered.get('feishu_sessions').output.schema)
 
-assert.equal(registered.output.schema.type, 'object', 'output schema must be a JSON Schema object')
-assert.equal(typeof registered.output.render, 'function', 'output.render is required by the registry')
-assert.equal(typeof registered.execute, 'function')
+assert.equal(registered.get('feishu_sessions').output.schema.type, 'object', 'output schema must be a JSON Schema object')
+assert.equal(typeof registered.get('feishu_sessions').output.render, 'function', 'output.render is required by the registry')
+assert.equal(typeof registered.get('feishu_sessions').execute, 'function')
+
+// The permission tool: a request must name a target mode, and the schema must be
+// just as provider-safe as the sessions one.
+const permission = registered.get('feishu_permission')
+assert.equal(permission.parameters.type, 'object')
+assert.deepEqual(permission.parameters.required, ['action'])
+assert.deepEqual(permission.parameters.properties.action.enum, ['current', 'request'])
+assert.deepEqual(permission.parameters.properties.mode.enum, ['readonly', 'workspace', 'auto', 'full'])
+assertNoPropertyRequired(permission.parameters)
+assertNoPropertyRequired(permission.output.schema)
+assert.equal(permission.output.schema.type, 'object')
+assert.equal(typeof permission.output.render, 'function')
+assert.equal(typeof permission.execute, 'function')
 
 console.log('feishu_sessions parameters:', JSON.stringify(parameters, null, 2))
 console.log('tool schema: all checks passed')
