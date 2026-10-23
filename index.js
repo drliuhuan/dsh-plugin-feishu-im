@@ -19,9 +19,10 @@ import { join } from 'node:path'
 
 import {
   forgetTenantToken,
-  sendCard,
-  getBotInfo,
   getTenantToken,
+  sendCard,
+  sendMessage,
+  getBotInfo,
   normalizeDomain,
   registrationBegin,
   registrationInit,
@@ -32,6 +33,7 @@ import { createAnswerers } from './lib/answers.js'
 import { createGateway } from './lib/gateway.js'
 import { createCaptureStore } from './lib/captures.js'
 import { createInbound } from './lib/inbound.js'
+import { createSessions } from './lib/sessions.js'
 import { createLabels } from './lib/labels.js'
 import { createNotifier } from './lib/notify.js'
 import { qrSvgDataUrl } from './lib/qr.js'
@@ -351,9 +353,11 @@ export function apply(ctx) {
   /** Workspace + session names for every outward message. */
   const describe = createLabels(ctx)
   const captures = createCaptureStore()
+  const sessions = createSessions({ ctx, readState, writeState, trace })
   const answers = createAnswerers({
     captures,
     ctx,
+    onResume: (chatId, row) => sessions.switchTo(chatId, row),
     readState,
     log: warn,
     trace,
@@ -371,7 +375,18 @@ export function apply(ctx) {
     log: warn,
     trace,
     captures,
+    sessions,
     onTextAnswer: (chatId, text) => answers.submitText(chatId, text),
+    postCard: async (chatId, card) => {
+      const state = await readState()
+      const token = await getTenantToken(state.appId, state.appSecret, state.domain)
+      return sendMessage(token, state.domain, {
+        receiveId: chatId,
+        receiveIdType: 'chat_id',
+        msgType: 'interactive',
+        content: card,
+      })
+    },
   })
   const gateway = createGateway({ inbound, cardAction: (data) => answers.handleCardAction(data), log: warn, trace })
   const notifier = createNotifier({
@@ -403,6 +418,92 @@ export function apply(ctx) {
   // WebSocket cannot fail the plugin's own load.
   setTimeout(syncGateway, 0)
 
+
+  ctx.inject(['tools'], (scope) => {
+    if (typeof scope.tools?.register !== 'function') return
+    try {
+      scope.effect(() => scope.tools.register({
+      name: 'feishu_sessions',
+      description: [
+        'List or switch the DSH session bound to this Feishu chat.',
+        'Use it when the user asks which conversations exist, or wants to continue in another one.',
+        'Switching takes effect for the NEXT message; the current turn stays in the current session.',
+      ].join(' '),
+      parameters: {
+        action: {
+          type: 'string',
+          required: true,
+          enum: ['list', 'current', 'switch'],
+          description: 'list (with optional query) / current / switch (needs ref)',
+        },
+        query: { type: 'string', description: 'Case-insensitive filter for action=list.' },
+        ref: {
+          type: 'string',
+          description: 'For action=switch: the 1-based number from the last list, a session id/prefix, or a title fragment.',
+        },
+      },
+      output: {
+        schema: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            message: { type: 'string', required: true },
+            sessions: {
+              type: 'array',
+              items: {
+                type: 'object',
+                additionalProperties: false,
+                properties: {
+                  index: { type: 'number', required: true },
+                  label: { type: 'string', required: true },
+                  sessionId: { type: 'string', required: true },
+                  running: { type: 'boolean', required: true },
+                },
+              },
+            },
+          },
+        },
+        // The model-facing projection: one text block is enough for a picker.
+        render: (_args, value) => [{ type: 'text', text: String(value?.message || '') }],
+      },
+      execute: async (args, exec) => {
+        const action = String(args?.action || 'list')
+        const sessionId = String(exec?.agent?.session?.id || exec?.agent?.id || '')
+        const bound = sessionId ? await sessions.chatOfSession(sessionId) : undefined
+        if (!bound) {
+          return { message: '这个会话没有绑定飞书对话，只能在飞书发起的会话里用。' }
+        }
+        if (action === 'current') {
+          const currentId = await sessions.current(bound.chatId)
+          if (!currentId) return { message: '这个对话还没有绑定会话。' }
+          const rows = await sessions.list({ limit: 50 })
+          const label = rows.find((entry) => entry.sessionId === currentId)?.label || String(currentId)
+          return { message: `当前绑定：${label}` }
+        }
+        if (action === 'switch') {
+          const row = await sessions.resolve(bound.chatId, String(args?.ref || ''))
+          await sessions.switchTo(bound.chatId, row)
+          return { message: `已切换到「${row.label}」；下一条消息会进这个会话。` }
+        }
+        const rows = await sessions.list({ query: String(args?.query || ''), limit: 10 })
+        sessions.remember(bound.chatId, rows)
+        return {
+          message: sessions.format(rows, await sessions.current(bound.chatId)),
+          sessions: rows.map((row, index) => ({
+            index: index + 1,
+            label: row.label,
+            sessionId: row.sessionId,
+            running: Boolean(row.running),
+          })),
+        }
+        },
+      }), `${PLUGIN_NAME}: feishu_sessions tool`)
+      probe('tool-registered', { name: 'feishu_sessions' })
+    } catch (error) {
+      probe('tool-failed', { message: String((error && error.message) || error) })
+      warn(`[${PLUGIN_NAME}] feishu_sessions tool unavailable: ${(error && error.message) || error}`)
+    }
+  })
 
   ctx.inject(['connection'], (scope) => {
     const connection = scope.connection

@@ -138,7 +138,7 @@ try {
     action: { value: optionButton.value },
     operator: { open_id: 'ou_stranger' },
   })
-  assert.equal(stranger.toast.type, 'warning', 'the settled card wins before the allowlist check')
+  assert.equal(stranger.toast.type, 'error', 'a stranger is refused before any request is touched')
 
   answers.uninstall()
   console.log('answers smoke: all cases passed')
