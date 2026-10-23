@@ -23,7 +23,7 @@ A Feishu (Lark) IM channel for DeepSeek Harness: create a dedicated Feishu bot b
 | Control | Send a message in Feishu → it runs in a DSH session → the result comes back to the same chat |
 | Steering | A message sent while a turn is running **joins that turn as guidance** instead of queueing, and the chat says so; `/queue` asks for the old queueing behaviour |
 | Sessions | `/sessions` lists them, tap a number to switch, or `/resume <n\|id\|title>` |
-| Permissions | Each chat picks one of four modes: read-only, workspace read-write, auto-review (plugin), full access |
+| Permissions | Each chat picks one of four modes: read-only, workspace read-write, Auto Review, full access |
 | Where they live | New conversations go to a configurable folder (default `~/dsh-plugin-feishu-im`) under a configurable workspace title (default 飞书IM) |
 | Rendering | Sent as **Card JSON 2.0**: headings, quotes, code blocks and tables render; long output paginates instead of being cut |
 
@@ -167,7 +167,7 @@ Every Feishu chat stores its own permission mode, applied to the session it is b
 |---|---|---|---|
 | Read-only | `read-only` | ask | Reads only; anything that crosses the line asks you |
 | Workspace read-write | `workspace-write` | ask | Writes inside the workspace; crossing asks you |
-| Auto review (plugin) | `read-only` | plugin decides | Runs read-only; the plugin approves workspace-write requests itself, while **anything asking for full access still asks you** |
+| Auto Review | `read-only` | plugin decides | Runs read-only; the plugin approves workspace-write requests itself, while **anything asking for full access still asks you** |
 | Full access | `danger-full-access` | never | No sandbox, no prompts |
 
 **Switching takes two cards**: `/permission` (or the agent, through the `feishu_permission` tool) posts the four

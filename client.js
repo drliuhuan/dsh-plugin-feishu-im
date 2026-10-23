@@ -13,20 +13,20 @@
   var API = '/api/feishu-im';
   // Bumped on every installed build: the page prints it, so a stale artifact is
   // visible instead of being mistaken for a code bug.
-  var BUILD = '1.15.0';
+  var BUILD = '1.15.1';
 
   // Kept in sync with lib/permissions.js; the Host validates whatever is saved.
   var PERMISSION_ORDER = ['readonly', 'workspace', 'auto', 'full'];
   var PERMISSION_LABELS = {
     readonly: '只读',
     workspace: '工作区读写',
-    auto: '自动审查（插件）',
+    auto: 'Auto Review',
     full: '完全权限',
   };
   var PERMISSION_HINTS = {
     readonly: '只能读，不能改文件；越界操作会来找你确认。',
     workspace: '可在工作区目录内读写，越界操作会来找你确认。',
-    auto: '交给宿主装的 Auto review：按会话模型逐个工具审查，危险的才问你。',
+    auto: '由宿主装的 Auto Review 逐次评估：放行即完全权限执行，危险的才来问你。',
     full: '不做沙箱限制，也不再向你询问。',
   };
 
