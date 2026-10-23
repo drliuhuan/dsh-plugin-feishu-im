@@ -37,7 +37,7 @@ globalThis.window = {
 
 globalThis.fetch = async () => new Response(JSON.stringify({ state: null }), { status: 200 })
 
-await import('/home/drliuhuan/workspace/plugins/dsh-plugin-feishu-im/client.js')
+await import(new URL('../client.js', import.meta.url).href)
 
 if (!plugin) throw new Error('client module did not register')
 

@@ -42,7 +42,7 @@ globalThis.window = {
   },
 }
 
-await import('/home/drliuhuan/workspace/plugins/dsh-plugin-feishu-im/client.js')
+await import(new URL('../client.js', import.meta.url).href)
 
 const internals = globalThis.__FEISHU_IM_INTERNALS__
 if (!internals) throw new Error('client module did not expose internals')
