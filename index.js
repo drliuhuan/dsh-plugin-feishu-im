@@ -428,7 +428,9 @@ export function apply(ctx) {
     {
       path: `${API}/service`,
       methods: ['GET', 'POST'],
-      handler: (request) => (request.method === 'GET' ? json(service.status()) : handlers.serviceAction(request)),
+      // `service.status()` is async: serializing the promise produced `{}`, which
+      // the settings page rendered as "not a service" on a systemd host.
+      handler: async (request) => (request.method === 'GET' ? json(await service.status()) : handlers.serviceAction(request)),
     },
   ]
 
