@@ -103,4 +103,40 @@ assert.equal(result.ok, true, 'request resolves ok after confirmation')
 assert.equal(result.mode, 'readonly')
 assert.equal(state.chatPermissions.oc_1, 'readonly')
 
-console.log('permission flow smoke: click + request passed')
+// The card must show what the session actually runs under, not the last choice:
+// a mode switched elsewhere (web UI, /permission, a restart) used to make the
+// "当前" line lie.
+const liveCtx = {
+  get: (name) => {
+    if (name === 'agents') return { get: (id) => ({ id, session: { id, header: { cwd: '/w' } } }) }
+    if (name === 'sandboxPolicy') return { resolve: () => ({ mode: 'read-only' }) }
+    return undefined
+  },
+}
+const livePermissions = createPermissions({ ctx: liveCtx, readState, writeState, trace: () => {} })
+const drifted = { ...state, chatPermissions: { oc_1: 'full' }, chatSessions: { oc_1: 'session-1' } }
+assert.equal(
+  livePermissions.effectiveMode(drifted, 'oc_1', 'session-1'),
+  'readonly',
+  'effective mode follows the live sandbox, not the stored choice',
+)
+const wsCtx = {
+  get: (name) => {
+    if (name === 'agents') return { get: (id) => ({ id, session: { id } }) }
+    if (name === 'sandboxPolicy') return { resolve: () => ({ mode: 'workspace-write' }) }
+    return undefined
+  },
+}
+const wsPermissions = createPermissions({ ctx: wsCtx, readState, writeState, trace: () => {} })
+assert.equal(
+  wsPermissions.effectiveMode({ ...drifted, chatPermissions: { oc_1: 'auto' } }, 'oc_1', 'session-1'),
+  'auto',
+  'auto is preserved when its sandbox matches',
+)
+assert.equal(
+  permissions.effectiveMode(drifted, 'oc_1', 'session-1'),
+  'full',
+  'without a live agent the stored value is all we can show',
+)
+
+console.log('permission flow smoke: click + request + effective-mode passed')
