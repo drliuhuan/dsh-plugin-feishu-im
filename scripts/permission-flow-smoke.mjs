@@ -16,12 +16,14 @@ const readState = async () => state
 const writeState = async (next) => { Object.assign(state, next); return state }
 
 const posted = []
+const patched = []
 const sendCard = async (st, target, element) => { posted.push(element); return { messageId: `om_${posted.length}` } }
+const updateCardFn = async (st, messageId, element) => { patched.push({ messageId, element }); return { ok: true } }
 const ctx = { get: () => undefined, on: () => () => {} }
 
 const permissions = createPermissions({ ctx, readState, writeState, trace: () => {} })
 const answers = createAnswerers({
-  permissions, ctx, readState, sendCard,
+  permissions, ctx, readState, sendCard, updateCardFn,
   log: () => {}, trace: () => {},
   isAllowed: async () => true,
   describe: () => ({ text: 'workspace › session' }),
@@ -36,6 +38,12 @@ const first = await answers.handleCardAction({
 assert.ok(first?.toast, 'selection returns a toast')
 assert.match(first.toast.content, /确认/, 'selection asks for confirmation')
 assert.equal(state.chatPermissions.oc_1, undefined, 'selection alone must not change the mode')
+
+// The picker must lose its buttons as soon as a mode is chosen: a leftover row
+// of them looks tappable and does nothing.
+const pickerPatch = patched.find((entry) => entry.element.header?.title?.content?.includes('等待确认'))
+assert.ok(pickerPatch, 'the picker card is rewritten after the first tap')
+assert.equal(pickerPatch.element.elements.some((el) => el.tag === 'action'), false, 'no buttons remain on the picker')
 
 const confirmCard = posted.at(-1)
 const elements = confirmCard?.elements || confirmCard?.body?.elements || []
@@ -70,7 +78,13 @@ const pickerAction = (picker.elements || []).find((el) => el.tag === 'action')
 const pickValue = pickerAction.actions[0].value
 assert.equal(pickValue.k, 'perm')
 assert.ok(pickValue.id, 'agent-issued picker carries the wait id')
-await answers.handleCardAction({ action: { value: pickValue }, open_message_id: 'om_5', operator: { open_id: 'ou_1' } })
+const pickerMessageId = `om_${posted.length}`
+// Feishu nests the message id under context; simulate a payload that omits it so
+// the fallback (the wait entry's stored id) has to cover for it.
+await answers.handleCardAction({ action: { value: pickValue }, operator: { open_id: 'ou_1' } })
+const fallbackPatch = patched.find((entry) => entry.messageId === pickerMessageId)
+assert.ok(fallbackPatch, 'picker is patched even without an open_message_id in the payload')
+assert.equal(fallbackPatch.element.elements.some((el) => el.tag === 'action'), false)
 const confirmAfterPick = posted.at(-1)
 const confirmAction = (confirmAfterPick.elements || []).find((el) => el.tag === 'action')
 await answers.handleCardAction({ action: { value: confirmAction.actions[0].value }, open_message_id: 'om_6', operator: { open_id: 'ou_1' } })
