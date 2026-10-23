@@ -534,6 +534,47 @@ export function apply(ctx) {
   ctx.on('session/event', (session, event) => notifier.onSessionEvent(session, event))
 
   /*
+   * Enforce the chat's permission mode at the start of every turn.
+   *
+   * The agent registry lookup proved unreliable (it silently returned nothing
+   * and the switch never reached the running session), but this hook is handed
+   * the Session object itself — enough to append the durable `sandbox/mode`
+   * event. The approval policy is re-asserted when an agent is reachable.
+   */
+  ctx.on('session/event', (session, event) => {
+    // `step/start` matters too: a mode switched mid-turn should reach the next
+    // tool call instead of waiting for the next user message.
+    if (event?.type !== 'turn/start' && event?.type !== 'step/start') return
+    void (async () => {
+      try {
+        const state = await readState()
+        const chatId = Object.entries(state.chatSessions || {}).find(([, id]) => id === session.id)?.[0]
+        if (!chatId) return
+        const mode = permissions.modeOf(state, chatId)
+        const spec = PERMISSION_MODES[mode]
+        const effective = ctx.get?.('sandboxPolicy')?.resolve?.({ session })?.mode
+        if (effective !== spec.sandbox) {
+          session.append('sandbox/mode', { mode: spec.sandbox })
+          trace?.('permission-session-applied', { mode, sandbox: spec.sandbox, from: effective })
+        }
+        const agent = ctx.get?.('agents')?.get?.(session.id)
+        if (agent) {
+          trace?.('permission-agent-found', { hasSession: Boolean(agent.session) })
+          try {
+            ctx.get('approval')?.setPolicy?.(agent, spec.approval)
+          } catch (error) {
+            trace?.('permission-approval-failed', { message: String(error?.message || error) })
+          }
+        } else {
+          trace?.('permission-agent-missing', { session: String(session.id).slice(0, 12) })
+        }
+      } catch (error) {
+        trace?.('permission-turn-hook-failed', { message: String(error?.message || error) })
+      }
+    })()
+  })
+
+  /*
    * A restart started by scripts/restart-dsh.py kills the whole systemd cgroup,
    * so the script cannot report its own success. It leaves a marker instead and
    * the fresh process (this one) delivers the "back up" message.
