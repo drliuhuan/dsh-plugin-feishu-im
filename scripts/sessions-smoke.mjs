@@ -50,7 +50,9 @@ const ctx = {
           const workspace = {
             path,
             title: title || path.split('/').pop(),
+            sessionIds: [],
             setTitle: async (next) => { workspace.title = next },
+            attachSession: async (sessionId) => { workspace.sessionIds.push(sessionId) },
           }
           created[created.length - 1].workspace = workspace
           return workspace
@@ -105,6 +107,14 @@ assert.equal(first.title, '飞书 IM 工作区')
 const before = created.length
 await sessions.ensureWorkspace('/home/me/feishu', '飞书 IM 工作区')
 assert.equal(created.length, before + 1, 'still one registry call, but no redundant retitle')
+
+// Sessions that already live in the folder are adopted into the workspace,
+// which is what makes them show up inside the group in the UI.
+summaries.push({ sessionId: 'session-feishuold', updatedAt: now, running: false, cwd: '/home/me/feishu', projections: { values: { title: '旧飞书会话' } } })
+await sessions.ensureWorkspace('/home/me/feishu', '飞书IM')
+assert.deepEqual(first.sessionIds, ['session-feishuold'], 'orphan session is attached to the workspace')
+await sessions.ensureWorkspace('/home/me/feishu', '飞书IM')
+assert.deepEqual(first.sessionIds, ['session-feishuold'], 'adoption is idempotent')
 
 // Home expansion for the configured folder.
 assert.equal(sessions.expandHome('~/dsh-plugin-feishu-im').endsWith('/dsh-plugin-feishu-im'), true)

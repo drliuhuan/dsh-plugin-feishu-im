@@ -1,6 +1,6 @@
 {
   "name": "dsh-plugin-feishu-im",
-  "version": "1.12.0",
+  "version": "1.12.1",
   "description": "DeepSeek Harness 的飞书 IM 通道：扫码创建专属飞书应用，推送任务进展与审批请求，并可在飞书中直接指挥 DSH。",
   "type": "module",
   "main": "index.js",
