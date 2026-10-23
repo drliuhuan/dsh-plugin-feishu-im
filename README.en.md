@@ -21,6 +21,7 @@ A Feishu (Lark) IM channel for DeepSeek Harness: create a dedicated Feishu bot b
 | Questions | `ask_user_question` options become buttons, plus a **Type your answer** path |
 | Progress | A `Typing` reaction on your message while working, `CrossMark` on failure |
 | Control | Send a message in Feishu → it runs in a DSH session → the result comes back to the same chat |
+| Steering | A message sent while a turn is running **joins that turn as guidance** instead of queueing, and the chat says so; `/queue` asks for the old queueing behaviour |
 | Sessions | `/sessions` lists them, tap a number to switch, or `/resume <n\|id\|title>` |
 | Where they live | New conversations go to a configurable folder (default `~/dsh-plugin-feishu-im`) under a configurable workspace title (default 飞书IM) |
 | Rendering | Sent as **Card JSON 2.0**: headings, quotes, code blocks and tables render; long output paginates instead of being cut |
@@ -136,6 +137,7 @@ sessions are filtered out and the current binding is marked `← current`.
 | `/resume <n\|id\|title>` | Switch the bound session |
 | `/current` | Show the current binding |
 | `/new` | Start a fresh session |
+| `/queue <text>` | Queue the message instead of steering |
 | `/restart` | Restart DSH (refused while a task is running) |
 | `/stop` | Ask the current session to stop |
 | `/id` | Print the session id |
