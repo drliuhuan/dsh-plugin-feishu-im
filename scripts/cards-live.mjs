@@ -142,7 +142,9 @@ function check(label, condition, extra) {
   console.log('[debug] posted after wait:', posted.length)
   const card = posted[0].card
   const option = firstButton(card, 'question')
-  await answers.handleCardAction({ action: { value: option.value }, operator: { open_id: saved.ownerOpenId } })
+  const clickResponse = await answers.handleCardAction({ action: { value: option.value }, operator: { open_id: saved.ownerOpenId } })
+  // Feishu re-renders on the callback response; a PATCH alone can be overwritten.
+  check('A callback returns the updated card', clickResponse?.card?.type === 'raw', JSON.stringify(clickResponse?.card?.type))
   await run
   const after = await readCard(posted[0].messageId)
   check('A title is 已作答', cardTitle(after.card).includes('已作答'), cardTitle(after.card))
