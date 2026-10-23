@@ -53,5 +53,11 @@
       "platform": "web",
       "immediately": true
     }
+  },
+  "scripts": {
+    "test": "node scripts/answers-smoke.mjs && node scripts/render-smoke.mjs",
+    "test:render": "node scripts/render-ssr.mjs",
+    "test:live": "node scripts/cards-live.mjs",
+    "test:timeout": "node scripts/timeout-live.mjs"
   }
 }
