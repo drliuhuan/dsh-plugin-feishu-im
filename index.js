@@ -473,8 +473,11 @@ export function apply(ctx) {
   const captures = createCaptureStore()
   const sessions = createSessions({ ctx, readState, writeState, trace })
   const permissions = createPermissions({ ctx, readState, writeState, trace })
+  /** chatId → the permission picker card's message id */
+  const permissionCards = new Map()
   const answers = createAnswerers({
     permissions,
+    permissionCards,
     captures,
     ctx,
     onResume: (chatId, row) => sessions.switchTo(chatId, row),
@@ -499,6 +502,7 @@ export function apply(ctx) {
     sessions,
     restart,
     permissions,
+    permissionCards,
     onTextAnswer: (chatId, text) => answers.submitText(chatId, text),
     updateCardMessage: async (messageId, card) => {
       const state = await readState()
@@ -724,7 +728,7 @@ export function apply(ctx) {
           const mode = permissions.modeOf(state, bound.chatId)
           if (String(args?.action || 'current') === 'current') {
             return {
-              message: `当前权限：${PERMISSION_MODES[mode].label}（沙箱 ${PERMISSION_MODES[mode].sandbox}）。${PERMISSION_MODES[mode].hint}`,
+              message: `当前权限：${PERMISSION_MODES[mode].label}。${PERMISSION_MODES[mode].hint}`,
               ok: true,
               mode,
               label: PERMISSION_MODES[mode].label,

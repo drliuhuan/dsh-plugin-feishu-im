@@ -22,8 +22,9 @@ const updateCardFn = async (st, messageId, element) => { patched.push({ messageI
 const ctx = { get: () => undefined, on: () => () => {} }
 
 const permissions = createPermissions({ ctx, readState, writeState, trace: () => {} })
+const permissionCards = new Map()
 const answers = createAnswerers({
-  permissions, ctx, readState, sendCard, updateCardFn,
+  permissions, permissionCards, ctx, readState, sendCard, updateCardFn,
   log: () => {}, trace: () => {},
   isAllowed: async () => true,
   describe: () => ({ text: 'workspace › session' }),
@@ -31,13 +32,19 @@ const answers = createAnswerers({
   onResume: async () => {},
 })
 
+// Simulate a /permission picker that the inbound half posted and registered.
+permissionCards.set('oc_1', 'om_picker')
 const first = await answers.handleCardAction({
   action: { value: { k: 'perm', c: 'oc_1', m: 'readonly' } },
-  open_message_id: 'om_1', operator: { open_id: 'ou_1' },
+  operator: { open_id: 'ou_1' },
 })
 assert.ok(first?.toast, 'selection returns a toast')
 assert.match(first.toast.content, /确认/, 'selection asks for confirmation')
 assert.equal(state.chatPermissions.oc_1, undefined, 'selection alone must not change the mode')
+assert.ok(
+  patched.some((entry) => entry.messageId === 'om_picker' && !entry.element.elements.some((el) => el.tag === 'action')),
+  'the /permission picker is retired by chat id when the payload has no message id',
+)
 
 // The picker must lose its buttons as soon as a mode is chosen: a leftover row
 // of them looks tappable and does nothing.
