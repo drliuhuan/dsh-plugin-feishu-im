@@ -25,7 +25,7 @@ A Feishu (Lark) IM channel for DeepSeek Harness: create a dedicated Feishu bot b
 | Sessions | `/sessions` lists them, tap a number to switch, or `/resume <n\|id\|title>` |
 | Permissions | Each chat picks one of four modes: read-only, workspace read-write, Auto Review, full access |
 | Where they live | New conversations go to a configurable folder (default `~/dsh-plugin-feishu-im`) under a configurable workspace title (default 飞书IM) |
-| Rendering | Sent as **Card JSON 2.0**: headings, quotes, code blocks and tables render; long output paginates instead of being cut |
+| Rendering | Sent as **Card JSON 2.0**: headings, quotes and code blocks render; tables use the native `table` element (flat header, compact rows); long output paginates |
 
 ## Install
 
@@ -206,7 +206,7 @@ results and card taps.
 | Button tap fails with `200340` | `card.action.trigger` not set as a long-connection callback, or no published version |
 | No Typing reaction | The app lacks the message-reaction write scope; sending still works |
 | Session shows as “unnamed” | Its title has not been generated yet; send one message and it fills in |
-| A table shows only 5 rows | Card 2.0 markdown table limit; the client paginates the rest |
+| A table shows only 10 rows | Native `table` elements page at `page_size: 10`; the client paginates the rest |
 
 ## Development
 
