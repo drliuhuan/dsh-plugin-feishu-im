@@ -139,4 +139,37 @@ assert.equal(
   'without a live agent the stored value is all we can show',
 )
 
-console.log('permission flow smoke: click + request + effective-mode passed')
+// With the Host's Auto review mounted, switching to 自动审查 must go through the
+// preset service (only that keeps the review gate armed).
+const presetCalls = []
+const presetCtx = {
+  get: (name) => {
+    if (name === 'agents') return { get: (id) => ({ id, session: { id } }) }
+    if (name === 'permissionPresets') {
+      return {
+        catalog: () => ({ options: [{ value: 'workspace' }, { value: 'auto' }] }),
+        current: () => 'workspace',
+        set: (session, name2) => { presetCalls.push({ session: session.id, name: name2 }) },
+      }
+    }
+    return undefined
+  },
+}
+const presetPermissions = createPermissions({ ctx: presetCtx, readState, writeState, trace: () => {} })
+assert.equal(presetPermissions.autoReviewAvailable(), true)
+assert.equal(presetPermissions.applyToAgent({ id: 'session-1', session: { id: 'session-1', append() { throw new Error('must not append') } } }, 'auto'), true)
+assert.deepEqual(presetCalls, [{ session: 'session-1', name: 'auto' }], 'auto switches the Host preset, not raw sandbox knobs')
+
+// Without the integration the heuristic fallback still applies a sandbox mode.
+const appended = []
+const plainPermissions = createPermissions({
+  ctx: {
+    get: (name) => (name === 'agents' ? { get: (id) => ({ id, session: { id } }) } : undefined),
+  },
+  readState, writeState, trace: () => {},
+})
+assert.equal(plainPermissions.autoReviewAvailable(), false)
+plainPermissions.applyToAgent({ id: 's', session: { id: 's', append: (type, data) => appended.push(data) } }, 'auto')
+assert.deepEqual(appended, [{ mode: 'read-only' }], 'fallback keeps the read-only start')
+
+console.log('permission flow smoke: click + request + effective-mode + auto-preset passed')

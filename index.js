@@ -552,6 +552,20 @@ export function apply(ctx) {
         if (!chatId) return
         const mode = permissions.modeOf(state, chatId)
         const spec = PERMISSION_MODES[mode]
+        if (mode === 'auto' && permissions.autoReviewAvailable()) {
+          // The Auto review preset owns the knobs (full access + ask); writing
+          // our own sandbox mode here would make `permissionPresets.current()`
+          // drift off `auto` and switch the review gate off.
+          if (!permissions.autoReviewed(session)) {
+            try {
+              ctx.get('permissionPresets').set(session, 'auto')
+              trace?.('permission-auto-preset-turn', {})
+            } catch (error) {
+              trace?.('permission-auto-preset-turn-failed', { message: String(error?.message || error) })
+            }
+          }
+          return
+        }
         const effective = ctx.get?.('sandboxPolicy')?.resolve?.({ session })?.mode
         if (effective !== spec.sandbox) {
           session.append('sandbox/mode', { mode: spec.sandbox })
