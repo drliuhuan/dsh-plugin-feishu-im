@@ -716,6 +716,7 @@ export function apply(ctx) {
           render: (result) => result?.message || '权限请求已处理',
         },
         execute: async (args, exec) => {
+          try {
           const sessionId = String(exec?.agent?.session?.id || exec?.agent?.id || '')
           const bound = sessionId ? await sessions.chatOfSession(sessionId) : undefined
           if (!bound) return { message: '这个会话没有绑定飞书对话，只能在飞书发起的会话里用。', ok: false }
@@ -748,6 +749,10 @@ export function apply(ctx) {
             mode: reply.mode,
             label: applied.label,
             sandbox: applied.sandbox,
+          }
+          } catch (error) {
+            probe('permission-tool-failed', { message: String((error && error.message) || error).slice(0, 160) })
+            return { message: `权限操作失败：${String((error && error.message) || error)}`, ok: false }
           }
         },
       }
