@@ -2,6 +2,14 @@
 //
 // Run: DSH_HOME=$(mktemp -d) node scripts/sessions-smoke.mjs
 import assert from 'node:assert/strict'
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+// These cases write fixture state. Point DSH_HOME at a throwaway directory even
+// when the caller forgot to, so a smoke test can never overwrite the operator's
+// real Feishu credentials again (that happened on 2026-10-23).
+if (!process.env.DSH_HOME) process.env.DSH_HOME = mkdtempSync(join(tmpdir(), 'fsim-smoke-'))
 
 const { createSessions } = await import('../lib/sessions.js')
 const { readState, writeState } = await import('../lib/state.js')

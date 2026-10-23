@@ -175,8 +175,10 @@ DSH_FEISHU_IM_TRACE=1 dsh web
 
 ## 开发
 
+测试会写 fixture 状态，`sessions-smoke` / `answers-smoke` 在未设置 `DSH_HOME` 时会自己指到临时目录——**不会**碰你 `~/.dsh/feishu-im/state.json` 里的真实凭据。手动跑其它会写状态的脚本时，请依然带上 `DSH_HOME=$(mktemp -d)`。
+
 ```bash
-npm test              # tool-schema + answers-smoke + sessions-smoke + render-smoke
+npm test              # tool-schema + inbound + answers + sessions + service + render
 npm run test:render   # 真 React 渲染每个页面状态（需要 react/react-dom）
 npm run test:live     # 真连飞书，回读卡片内容并断言三种终态
 npm run test:timeout  # 真连飞书，走一遍超时转回
