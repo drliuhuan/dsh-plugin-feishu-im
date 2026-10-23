@@ -101,15 +101,15 @@ npm i -g dsh-plugin-feishu-im
 
 ### 提问卡片
 
-![提问卡片](./docs/screenshots/04-question-input.webp)
+![提问卡片](./docs/screenshots/04-question-input.gif)
 
 点选项直接作答，或点「✏️ 输入你的答案」后在下一条消息里写答案。
 
-![点选项作答](./docs/screenshots/05-question-option.webp)
+![点选项作答](./docs/screenshots/05-question-option.gif)
 
 ### 授权卡片
 
-![需要授权](./docs/screenshots/06-approval.webp)
+![需要授权](./docs/screenshots/06-approval.gif)
 
 ### 任务完成
 
@@ -117,7 +117,7 @@ npm i -g dsh-plugin-feishu-im
 
 ## 会话列表与切换
 
-![会话列表](./docs/screenshots/08-session-list.webp)
+![会话列表](./docs/screenshots/08-session-list.gif)
 
 `/sessions [关键字]`（别名 `/history`）发一张带编号按钮的列表卡，点编号即切换；也可以 `/resume <编号|id|标题>`。
 切换后就地改写那张卡，只保留目标会话标题。列表会过滤子代理会话，并标出当前会话（`←当前`）。

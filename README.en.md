@@ -109,15 +109,15 @@ later messages go to DSH as usual.”*
 
 ### Question card
 
-![Question card](./docs/screenshots/04-question-input.webp)
+![Question card](./docs/screenshots/04-question-input.gif)
 
 Tap an option to answer inline, or tap **✏️ Type your answer** and send the answer as your next message.
 
-![Answering by option](./docs/screenshots/05-question-option.webp)
+![Answering by option](./docs/screenshots/05-question-option.gif)
 
 ### Approval card
 
-![Approval card](./docs/screenshots/06-approval.webp)
+![Approval card](./docs/screenshots/06-approval.gif)
 
 ### Task finished
 
@@ -125,7 +125,7 @@ Tap an option to answer inline, or tap **✏️ Type your answer** and send the 
 
 ## Session list and switching
 
-![Session list](./docs/screenshots/08-session-list.webp)
+![Session list](./docs/screenshots/08-session-list.gif)
 
 `/sessions [keyword]` (alias `/history`) posts a numbered list card; tap a number to switch, or use
 `/resume <n|id|title>`. The card is rewritten in place to show only the bound session title afterwards. Sub-agent
