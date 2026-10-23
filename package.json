@@ -18,7 +18,9 @@
     "locale/*.json",
     "icon.svg",
     "cordis.patch.yml",
-    "README.md"
+    "README.md",
+    "docs/screenshots",
+    "README.en.md"
   ],
   "license": "MIT",
   "keywords": [
