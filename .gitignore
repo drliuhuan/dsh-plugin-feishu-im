@@ -1,0 +1,13 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Test-only React install used by scripts/render-ssr.mjs
+.tmp-react/
+
+# Packed artifacts
+*.tgz
+
+# Local state, logs, editor noise
+*.log
+.DS_Store

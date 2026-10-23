@@ -1,0 +1,8 @@
+# Adds only this plugin's row. It does not replace any shipped component.
+#
+# The Loader entry name must stay identical to the package name: the Web client
+# module system resolves a plugin's browser half from its entry name.
+- insert:
+    - id: feishu-im
+      name: dsh-plugin-feishu-im
+      config: {}
