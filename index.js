@@ -25,6 +25,8 @@ import {
   sendMessage,
   updateCard,
   getBotInfo,
+  listChats,
+  pickTestTarget,
   normalizeDomain,
   registrationBegin,
   registrationInit,
@@ -388,20 +390,30 @@ export function apply(ctx) {
       return json({ state: publicState(saved), bot })
     },
 
-    /** Send the one message that proves outbound delivery works. */
+    /**
+     * Send the one message that proves outbound delivery works.
+     *
+     * Manual credentials have no owner open_id until the operator messages the
+     * bot, so fall back to the bound chat and then to a chat the bot is already
+     * in instead of failing with "还没有可用的 open_id".
+     */
     async test() {
       const state = await requireConfigured()
-      const target = state.ownerOpenId || state.allowedOpenIds[0] || ''
-      if (!target) {
-        throw new Error('还没有可用的飞书用户 open_id：请重新扫码授权，或在允许列表里填写你的 open_id。')
-      }
       const token = await getTenantToken(state.appId, state.appSecret, state.domain)
+      const chats = await listChats(token, state.domain).catch(() => [])
+      const target = pickTestTarget(state, chats)
+      if (!target) {
+        throw new Error(
+          '还没有可用的对话或用户：先在飞书里给机器人发一条消息（会自动记录成接收方），或重新扫码授权。',
+        )
+      }
+      trace('test-target', { source: target.source })
       const sent = await sendText(token, state.domain, {
-        receiveId: target,
-        receiveIdType: 'open_id',
+        receiveId: target.receiveId,
+        receiveIdType: target.receiveIdType,
         text: '✅ DSH 飞书 IM 已连接。\n之后任务完成、需要授权、需要你回答时，都会发到这个对话。',
       })
-      return json({ ok: true, messageId: sent.messageId })
+      return json({ ok: true, messageId: sent.messageId, target: target.source })
     },
 
     /** Drop the connection. */
