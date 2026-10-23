@@ -1,5 +1,8 @@
 # dsh-plugin-feishu-im
 
+[![npm](https://img.shields.io/npm/v/dsh-plugin-feishu-im.svg)](https://www.npmjs.com/package/dsh-plugin-feishu-im)
+[![license](https://img.shields.io/npm/l/dsh-plugin-feishu-im.svg)](./LICENSE)
+
 DeepSeek Harness 的飞书 IM 通道：在 DSH Web 的「设置 → 飞书 IM」里扫码创建一个专属飞书机器人，
 把任务进展、审批请求、提问推到飞书，并允许在飞书里直接指挥 DSH。
 
@@ -149,7 +152,15 @@ node scripts/render-smoke.mjs     # 组件树冒烟（自带 React 桩）
 node scripts/render-ssr.mjs       # 真 React 19 渲染每个页面状态（需 ../.tmp-react）
 ```
 
-安装：
+安装（推荐，从 npm）：
+
+```bash
+plugin_manager install_bundle dsh-plugin-feishu-im
+# 或
+npm i -g dsh-plugin-feishu-im
+```
+
+本地改动想先试，用 tarball：
 
 ```
 plugin_manager install_bundle /absolute/path/to/dsh-plugin-feishu-im-<version>.tgz
