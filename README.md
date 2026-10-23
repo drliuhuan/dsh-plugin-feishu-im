@@ -42,6 +42,9 @@ npm i -g dsh-plugin-feishu-im
 设置页「部署方式」可以把 DSH 装成**用户级** systemd 服务（`~/.config/systemd/user/dsh.service`，`Restart=always`），
 全程不需要 sudo —— 这对只能通过网页 / 飞书操作、没有终端可以输入密码的部署尤其重要。
 
+- 设置页会先**检测当前是否已经是服务模式**（系统级 / 用户级），已托管时按钮禁用并显示是哪一种；
+- Windows 下该选项直接禁用，并提示「当前仅支持 Linux（用户级 systemd）与 macOS（launchd）」；
+- 未托管时会提示风险：进程退出或重启机器后不会自动拉起、关闭终端或注销会中断；
 - 已经由**系统级** `dsh.service` 托管时，插件会拒绝安装用户级服务，避免两个进程抢 3080；
 - 「注销后仍运行」需要 root 一次性执行 `loginctl enable-linger $USER`（本机已开启）；
 - 装好后的重启走 `systemctl --user restart dsh.service`，`scripts/restart-dsh.py` 会自动优先用它，
@@ -124,6 +127,7 @@ npm i -g dsh-plugin-feishu-im
 | `/resume <编号\|id\|标题>` | 切换当前会话 |
 | `/current` | 看当前绑定 |
 | `/new` | 开一个新会话 |
+| `/restart` | 重启 DSH（有任务在跑时拒绝并说明） |
 | `/stop` | 让当前会话停下 |
 | `/id` | 当前会话 id |
 | `/help` | 命令说明 |

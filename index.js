@@ -37,6 +37,7 @@ import { createCaptureStore } from './lib/captures.js'
 import { createInbound } from './lib/inbound.js'
 import { createSessions } from './lib/sessions.js'
 import { createLabels } from './lib/labels.js'
+import { createRestart } from './lib/restart.js'
 import * as service from './lib/service.js'
 import { createNotifier } from './lib/notify.js'
 import { qrSvgDataUrl } from './lib/qr.js'
@@ -441,6 +442,9 @@ export function apply(ctx) {
   handlers.serviceAction = async (request) => {
     const body = (await request.json().catch(() => ({}))) || {}
     const action = String(body.action || '')
+    if (action === 'restart-now') {
+      return json(await restart.request({ sessionId: body.sessionId, reason: '设置页重启' }))
+    }
     if (action === 'install') return json(await service.install({ cwd: process.cwd() }))
     if (action === 'remove') return json(await service.remove())
     if (action === 'restart') return json(await service.restart())
@@ -467,6 +471,7 @@ export function apply(ctx) {
       return openId === state.ownerOpenId || state.allowedOpenIds.includes(openId)
     },
   })
+  const restart = createRestart({ ctx, readState, trace, log: warn })
   const inbound = createInbound({
     ctx,
     readState,
@@ -475,6 +480,7 @@ export function apply(ctx) {
     trace,
     captures,
     sessions,
+    restart,
     onTextAnswer: (chatId, text) => answers.submitText(chatId, text),
     updateCardMessage: async (messageId, card) => {
       const state = await readState()

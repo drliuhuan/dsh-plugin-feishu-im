@@ -43,6 +43,11 @@ Then open **Settings → Feishu IM**.
 (`~/.config/systemd/user/dsh.service`, `Restart=always`) without any sudo — which matters when the operator only has
 the web UI or Feishu and no terminal to type a password into.
 
+- The page first **detects whether DSH already runs as a service** (system or user level); the button is disabled when it
+  is, and says which one owns the process.
+- The option is disabled on Windows with a “Linux only (plus macOS launchd)” explanation.
+- When nothing supervises the process, it warns that an exit or reboot will not restart DSH and that closing the terminal
+  or logging out ends it.
 - If a **system** `dsh.service` already owns the process, the plugin refuses to install a second, competing user unit.
 - Surviving logout needs one root-time `loginctl enable-linger $USER` (already enabled on this host).
 - Restarts then go through `systemctl --user restart dsh.service`; `scripts/restart-dsh.py` prefers it automatically and
@@ -131,6 +136,7 @@ sessions are filtered out and the current binding is marked `← current`.
 | `/resume <n\|id\|title>` | Switch the bound session |
 | `/current` | Show the current binding |
 | `/new` | Start a fresh session |
+| `/restart` | Restart DSH (refused while a task is running) |
 | `/stop` | Ask the current session to stop |
 | `/id` | Print the session id |
 | `/help` | Command reference |
