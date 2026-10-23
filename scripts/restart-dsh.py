@@ -78,6 +78,20 @@ def daemonize() -> None:
     os.dup2(devnull, 2)
 
 
+def sandboxed() -> bool:
+    """True when this shell runs inside the bwrap PID namespace.
+
+    With `--unshare-pid` the Host is not visible here at all, so this script
+    cannot find — let alone signal — it. The plugin's own `/restart` command runs
+    inside the Host and is the correct path in that case.
+    """
+    try:
+        argv = open('/proc/1/cmdline', 'rb').read()
+    except OSError:
+        return False
+    return b'bwrap' in argv or b'unshare-pid' in argv
+
+
 def find_host_pids() -> list[int]:
     pids = []
     for entry in os.listdir('/proc'):
@@ -308,6 +322,14 @@ def main() -> int:
     if pid is None:
         pids = find_host_pids()
         if len(pids) != 1:
+            if sandboxed() and not pids:
+                print(
+                    '这个 shell 跑在文件沙盒里（bwrap --unshare-pid），看不到宿主进程，无法重启。\n'
+                    '请在飞书发 /restart，或点 DSH 设置页的「立即重启 DSH」。',
+                    file=sys.stderr,
+                )
+                log('restart: sandboxed shell cannot see the host; use /restart from Feishu')
+                return 2
             print(f'expected exactly one dsh host, found {pids}; pass --pid', file=sys.stderr)
             return 2
         pid = pids[0]
