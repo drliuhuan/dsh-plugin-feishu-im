@@ -123,7 +123,7 @@ assert.equal(
 const wsCtx = {
   get: (name) => {
     if (name === 'agents') return { get: (id) => ({ id, session: { id } }) }
-    if (name === 'sandboxPolicy') return { resolve: () => ({ mode: 'workspace-write' }) }
+    if (name === 'sandboxPolicy') return { resolve: () => ({ mode: 'read-only' }) }
     return undefined
   },
 }

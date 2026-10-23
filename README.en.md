@@ -167,7 +167,7 @@ Every Feishu chat stores its own permission mode, applied to the session it is b
 |---|---|---|---|
 | Read-only | `read-only` | ask | Reads only; anything that crosses the line asks you |
 | Workspace read-write | `workspace-write` | ask | Writes inside the workspace; crossing asks you |
-| Auto review (plugin) | `workspace-write` | plugin decides | The plugin approves workspace-level requests itself; **anything asking for full access still asks you** |
+| Auto review (plugin) | `read-only` | plugin decides | Runs read-only; the plugin approves workspace-write requests itself, while **anything asking for full access still asks you** |
 | Full access | `danger-full-access` | never | No sandbox, no prompts |
 
 **Switching takes two cards**: `/permission` (or the agent, through the `feishu_permission` tool) posts the four
