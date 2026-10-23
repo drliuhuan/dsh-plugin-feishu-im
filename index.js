@@ -39,6 +39,7 @@ import { createCaptureStore } from './lib/captures.js'
 import { createInbound } from './lib/inbound.js'
 import { createSessions } from './lib/sessions.js'
 import { createLabels } from './lib/labels.js'
+import { createPermissions } from './lib/permissions.js'
 import { createRestart } from './lib/restart.js'
 import * as service from './lib/service.js'
 import { createNotifier } from './lib/notify.js'
@@ -471,7 +472,9 @@ export function apply(ctx) {
   const describe = createLabels(ctx)
   const captures = createCaptureStore()
   const sessions = createSessions({ ctx, readState, writeState, trace })
+  const permissions = createPermissions({ ctx, readState, writeState, trace })
   const answers = createAnswerers({
+    permissions,
     captures,
     ctx,
     onResume: (chatId, row) => sessions.switchTo(chatId, row),
@@ -495,6 +498,7 @@ export function apply(ctx) {
     captures,
     sessions,
     restart,
+    permissions,
     onTextAnswer: (chatId, text) => answers.submitText(chatId, text),
     updateCardMessage: async (messageId, card) => {
       const state = await readState()

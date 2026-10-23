@@ -23,6 +23,7 @@ A Feishu (Lark) IM channel for DeepSeek Harness: create a dedicated Feishu bot b
 | Control | Send a message in Feishu → it runs in a DSH session → the result comes back to the same chat |
 | Steering | A message sent while a turn is running **joins that turn as guidance** instead of queueing, and the chat says so; `/queue` asks for the old queueing behaviour |
 | Sessions | `/sessions` lists them, tap a number to switch, or `/resume <n\|id\|title>` |
+| Permissions | Each chat picks one of four modes: read-only, workspace read-write, auto-review (plugin), full access |
 | Where they live | New conversations go to a configurable folder (default `~/dsh-plugin-feishu-im`) under a configurable workspace title (default 飞书IM) |
 | Rendering | Sent as **Card JSON 2.0**: headings, quotes, code blocks and tables render; long output paginates instead of being cut |
 
@@ -138,6 +139,7 @@ sessions are filtered out and the current binding is marked `← current`.
 | `/current` | Show the current binding |
 | `/new` | Start a fresh session |
 | `/queue <text>` | Queue the message instead of steering |
+| `/permission`, `/mode` | Show and switch this chat's permission mode |
 | `/restart` | Restart DSH (refused while a task is running) |
 | `/stop` | Ask the current session to stop |
 | `/id` | Print the session id |
@@ -155,6 +157,19 @@ The **Feishu session location** settings control two things:
   existing workspace when the next Feishu conversation is created.
 
 Existing conversations keep their folder; send `/new` to start one in the new location.
+
+## Session permissions
+
+Every Feishu chat stores its own permission mode, applied to the session it is bound to:
+
+| Mode | Sandbox | Approval | Meaning |
+|---|---|---|---|
+| Read-only | `read-only` | ask | Reads only; anything that crosses the line asks you |
+| Workspace read-write | `workspace-write` | ask | Writes inside the workspace; crossing asks you |
+| Auto review (plugin) | `workspace-write` | plugin decides | The plugin approves workspace-level requests itself; **anything asking for full access still asks you** |
+| Full access | `danger-full-access` | never | No sandbox, no prompts |
+
+Under the hood the sandbox is a session-level `sandbox/mode` event, the approval side is `approval.setPolicy`, and `auto` deliberately keeps `ask` so the plugin can decide (it posts “🤖 auto-approved …” when it does). Settings sets the default for new sessions; `/permission` overrides one chat.
 
 ## Security model
 

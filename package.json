@@ -1,6 +1,6 @@
 {
   "name": "dsh-plugin-feishu-im",
-  "version": "1.12.3",
+  "version": "1.13.0",
   "description": "DeepSeek Harness 的飞书 IM 通道：扫码创建专属飞书应用，推送任务进展与审批请求，并可在飞书中直接指挥 DSH。",
   "type": "module",
   "main": "index.js",
@@ -60,7 +60,7 @@
     }
   },
   "scripts": {
-    "test": "node scripts/tool-schema.mjs && node scripts/inbound-smoke.mjs && node scripts/target-smoke.mjs && node scripts/answers-smoke.mjs && node scripts/sessions-smoke.mjs && node scripts/service-smoke.mjs && node scripts/render-smoke.mjs",
+    "test": "node scripts/tool-schema.mjs && node scripts/inbound-smoke.mjs && node scripts/target-smoke.mjs && node scripts/permissions-smoke.mjs && node scripts/answers-smoke.mjs && node scripts/sessions-smoke.mjs && node scripts/service-smoke.mjs && node scripts/render-smoke.mjs",
     "test:render": "node scripts/render-ssr.mjs",
     "test:live": "node scripts/cards-live.mjs",
     "test:timeout": "node scripts/timeout-live.mjs"

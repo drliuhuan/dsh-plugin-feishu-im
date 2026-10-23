@@ -13,7 +13,22 @@
   var API = '/api/feishu-im';
   // Bumped on every installed build: the page prints it, so a stale artifact is
   // visible instead of being mistaken for a code bug.
-  var BUILD = '1.10.0';
+  var BUILD = '1.13.0';
+
+  // Kept in sync with lib/permissions.js; the Host validates whatever is saved.
+  var PERMISSION_ORDER = ['readonly', 'workspace', 'auto', 'full'];
+  var PERMISSION_LABELS = {
+    readonly: '只读',
+    workspace: '工作区读写',
+    auto: '自动审查（插件）',
+    full: '完全权限',
+  };
+  var PERMISSION_HINTS = {
+    readonly: '只能读，不能改文件；越界操作会来找你确认。',
+    workspace: '可在工作区目录内读写，越界操作会来找你确认。',
+    auto: '工作区内的操作由插件自动批准；要求完全权限的仍会问你。',
+    full: '不做沙箱限制，也不再向你询问。',
+  };
 
   var CSS = [
     '.fsim-page{display:flex;flex-direction:column;gap:20px;max-width:760px;color:var(--dsw-alias-label-primary,#1a1a1a);}',
@@ -534,6 +549,25 @@
                 if (wsTitleDraft !== state.workspaceTitle) savePrefs({ workspaceTitle: wsTitleDraft });
               },
             }))),
+
+        h(Card, { title: '会话权限' },
+          h('p', { className: 'fsim-sub' },
+            '飞书里新建的会话默认用哪种权限；单个对话可以随时用 /permission 覆盖。'),
+          h(Field, {
+            label: '默认权限',
+            hint: PERMISSION_HINTS[state.defaultPermission || 'workspace'] || '',
+          },
+            h('div', { className: 'fsim-row fsim-wrap' },
+              PERMISSION_ORDER.map(function (key) {
+                var active = (state.defaultPermission || 'workspace') === key;
+                return h('button', {
+                  key: key,
+                  type: 'button',
+                  className: 'fsim-btn' + (active ? ' fsim-btn-primary' : ''),
+                  disabled: Boolean(busy) || active,
+                  onClick: function () { savePrefs({ defaultPermission: key }); },
+                }, PERMISSION_LABELS[key]);
+              })))),
 
         h(Card, { title: '部署方式' },
           (function () {
