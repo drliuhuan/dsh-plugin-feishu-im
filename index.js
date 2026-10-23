@@ -37,6 +37,7 @@ import { createCaptureStore } from './lib/captures.js'
 import { createInbound } from './lib/inbound.js'
 import { createSessions } from './lib/sessions.js'
 import { createLabels } from './lib/labels.js'
+import * as service from './lib/service.js'
 import { createNotifier } from './lib/notify.js'
 import { qrSvgDataUrl } from './lib/qr.js'
 import { clearState, publicState, readState, writeState } from './lib/state.js'
@@ -423,9 +424,29 @@ export function apply(ctx) {
     { path: `${API}/verify`, methods: ['POST'], handler: handlers.verify },
     { path: `${API}/test`, methods: ['POST'], handler: handlers.test },
     { path: `${API}/disconnect`, methods: ['POST'], handler: handlers.disconnect },
+    {
+      path: `${API}/service`,
+      methods: ['GET', 'POST'],
+      handler: (request) => (request.method === 'GET' ? json(service.status()) : handlers.serviceAction(request)),
+    },
   ]
 
   ctx.effect(() => () => pending.clear(), `${PLUGIN_NAME}: pending registrations`)
+
+  /*
+   * Rootless service management. A *user* systemd unit needs no sudo, which is
+   * the only workable answer when the operator reaches this machine through the
+   * web UI / Feishu and has no terminal to type a password into.
+   */
+  handlers.serviceAction = async (request) => {
+    const body = (await request.json().catch(() => ({}))) || {}
+    const action = String(body.action || '')
+    if (action === 'install') return json(await service.install({ cwd: process.cwd() }))
+    if (action === 'remove') return json(await service.remove())
+    if (action === 'restart') return json(await service.restart())
+    if (action === 'status') return json(await service.status())
+    throw new Error(`unknown action: ${action}`)
+  }
 
   const trace = (stage, detail) => probe(stage, detail)
   /** Workspace + session names for every outward message. */

@@ -37,6 +37,16 @@ npm i -g dsh-plugin-feishu-im
 
 装好后进入 **设置 → 飞书 IM**。
 
+## 做成服务（不需要 sudo）
+
+设置页「部署方式」可以把 DSH 装成**用户级** systemd 服务（`~/.config/systemd/user/dsh.service`，`Restart=always`），
+全程不需要 sudo —— 这对只能通过网页 / 飞书操作、没有终端可以输入密码的部署尤其重要。
+
+- 已经由**系统级** `dsh.service` 托管时，插件会拒绝安装用户级服务，避免两个进程抢 3080；
+- 「注销后仍运行」需要 root 一次性执行 `loginctl enable-linger $USER`（本机已开启）；
+- 装好后的重启走 `systemctl --user restart dsh.service`，`scripts/restart-dsh.py` 会自动优先用它，
+  并仍按「忙碌检测 → 飞书预告 → 重启 → 新进程发完成通知」的流程执行。
+
 ## 连接飞书
 
 ### 扫码创建（推荐）

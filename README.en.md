@@ -37,6 +37,17 @@ npm i -g dsh-plugin-feishu-im
 
 Then open **Settings → Feishu IM**.
 
+## Install as a service (no sudo)
+
+**Settings → Deployment** can install DSH as a **user** systemd unit
+(`~/.config/systemd/user/dsh.service`, `Restart=always`) without any sudo — which matters when the operator only has
+the web UI or Feishu and no terminal to type a password into.
+
+- If a **system** `dsh.service` already owns the process, the plugin refuses to install a second, competing user unit.
+- Surviving logout needs one root-time `loginctl enable-linger $USER` (already enabled on this host).
+- Restarts then go through `systemctl --user restart dsh.service`; `scripts/restart-dsh.py` prefers it automatically and
+  still runs the busy-check → Feishu notice → restart → "back up" notice sequence.
+
 ## Connecting to Feishu
 
 ### Scan to create (recommended)

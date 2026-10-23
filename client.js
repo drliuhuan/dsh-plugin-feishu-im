@@ -13,7 +13,7 @@
   var API = '/api/feishu-im';
   // Bumped on every installed build: the page prints it, so a stale artifact is
   // visible instead of being mistaken for a code bug.
-  var BUILD = '1.9.3';
+  var BUILD = '1.10.0';
 
   var CSS = [
     '.fsim-page{display:flex;flex-direction:column;gap:20px;max-width:760px;color:var(--dsw-alias-label-primary,#1a1a1a);}',
@@ -406,6 +406,25 @@
           .then(function () { setBusy(''); });
       }
 
+      var serviceState = useState(null);
+      var service = serviceState[0];
+      var setService = serviceState[1];
+
+      function loadService() {
+        api('/service', { method: 'GET' })
+          .then(function (result) { setService(result); })
+          .catch(function () { setService(null); });
+      }
+
+      function installService() {
+        run('service', function () {
+          return api('/service', { method: 'POST', body: { action: 'install' } });
+        }, '已写入用户级服务；下次重启后由它托管，全程不需要 sudo。');
+        setTimeout(loadService, 1500);
+      }
+
+      useEffect(function () { loadService(); }, []);
+
       function savePrefs(patch) {
         var previous = state;
         setState(function (current) {
@@ -495,6 +514,34 @@
                 if (wsTitleDraft !== state.workspaceTitle) savePrefs({ workspaceTitle: wsTitleDraft });
               },
             }))),
+
+        h(Card, { title: '部署方式' },
+          h('p', { className: 'fsim-sub' },
+            '把 DSH 做成用户级 systemd 服务：不需要 sudo，注销或重启机器后仍会自动拉起。'),
+          service && service.systemHosted
+            ? h('p', { className: 'fsim-hint' }, service.hint)
+            : h(React.Fragment, null,
+              h(Field, {
+                label: '用户级服务',
+                hint: service && service.installed
+                  ? (service.active ? '已安装并在运行。' : '已安装、开机自启（下次重启 DSH 时接管）。') + (service.linger === false ? ' linger 未开启，注销后会停止。' : '')
+                  : '未安装。安装后不需要任何 sudo 授权。',
+              },
+                h('div', { className: 'fsim-row' },
+                  h('button', {
+                    type: 'button',
+                    className: 'fsim-btn fsim-btn-primary',
+                    disabled: Boolean(busy) || (service && service.installed),
+                    onClick: installService,
+                  }, busy === 'service' ? '正在安装…' : (service && service.installed ? '已安装' : '做成服务（无需 sudo）')),
+                  service && service.linger === false
+                    ? h('span', { className: 'fsim-hint' }, '注销后保持运行：需在 root 终端执行一次 loginctl enable-linger')
+                    : null)),
+              service && service.installed && service.unit
+                ? h('details', null,
+                  h('summary', { className: 'fsim-hint' }, '查看生成的 ' + service.unitPath),
+                  h('pre', { className: 'fsim-pre' }, service.unit))
+                : null)),
 
         h(Card, { title: '指挥与安全' },
           h(Row, { label: '允许在飞书里指挥 DSH', hint: '关闭后，飞书只用来接收通知，收到的消息不会变成对话。' },

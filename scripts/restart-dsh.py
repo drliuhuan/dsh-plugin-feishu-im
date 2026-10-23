@@ -222,6 +222,29 @@ def systemd_policy(unit: str) -> str:
         return ''
 
 
+USER_UNIT = os.path.expanduser('~/.config/systemd/user/dsh.service')
+
+
+def user_unit_installed() -> bool:
+    return os.path.exists(USER_UNIT)
+
+
+def user_systemd_restart() -> str:
+    """Restart through the user manager; returns '' on success, else the error."""
+    uid = os.getuid()
+    env = dict(os.environ)
+    env.setdefault('XDG_RUNTIME_DIR', f'/run/user/{uid}')
+    env.setdefault('DBUS_SESSION_BUS_ADDRESS', f'unix:path=/run/user/{uid}/bus')
+    try:
+        result = subprocess.run(
+            ['systemctl', '--user', 'restart', 'dsh.service'],
+            capture_output=True, text=True, timeout=30, env=env,
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        return str(error)
+    return '' if result.returncode == 0 else (result.stderr or result.stdout or 'systemctl failed').strip()
+
+
 def container_kind() -> str:
     """'docker' / 'k8s' when the Host runs in a container, else ''."""
     try:
@@ -304,6 +327,7 @@ def main() -> int:
     unit = systemd_unit(pid)
     policy = systemd_policy(unit) if unit else ''
     container = container_kind()
+    user_unit = user_unit_installed()
     signal_name = 'SIGKILL' if policy in ('on-failure', 'on-abnormal', 'on-watchdog') else 'SIGTERM'
     if unit:
         action = f'systemd({unit}) policy={policy or "?"} → {signal_name}, systemd restarts'
@@ -311,6 +335,8 @@ def main() -> int:
         action = f'container({container}) → {signal_name}, the runtime restarts the container'
     else:
         action = 'no supervisor → daemonized respawn by this script'
+    if user_unit and not (unit and policy):
+        action = 'user unit dsh.service → systemctl --user restart'
     print(f'  restart path={action}', flush=True)
 
     if args.check:
@@ -365,6 +391,21 @@ def main() -> int:
         os.kill(pid, getattr(signal, signal_name))
     except ProcessLookupError:
         log('restart: host already gone')
+
+    if user_unit and not (unit and policy):
+        # The user unit already owns a supervised restart; no signals needed and
+        # no cgroup teardown can cancel it.
+        error = user_systemd_restart()
+        if error:
+            log(f'restart: systemctl --user restart failed: {error}')
+            return 1
+        for _ in range(90):
+            time.sleep(1.0)
+            if listener_up():
+                log(f'restart: listener is back on {PORT} via the user unit')
+                return 0
+        log(f'restart: WARNING user unit did not bring {PORT} back within 90s')
+        return 1
 
     if unit or container:
         # systemd / the container runtime owns the restart; spawning a second
