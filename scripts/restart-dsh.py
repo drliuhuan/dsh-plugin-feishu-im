@@ -208,15 +208,44 @@ def plugin_version() -> str:
         return '?'
 
 
+def systemd_policy(unit: str) -> str:
+    """The unit's Restart= policy (readable without root), or '' when unknown."""
+    if not unit:
+        return ''
+    try:
+        result = subprocess.run(
+            ['systemctl', 'show', unit, '-p', 'Restart', '--value'],
+            capture_output=True, text=True, timeout=5,
+        )
+        return result.stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return ''
+
+
+def container_kind() -> str:
+    """'docker' / 'k8s' when the Host runs in a container, else ''."""
+    try:
+        cgroup = open('/proc/1/cgroup', encoding='utf-8').read() + open(f'/proc/{os.getpid()}/cgroup', encoding='utf-8').read()
+    except OSError:
+        return ''
+    if 'kubepods' in cgroup:
+        return 'k8s'
+    if 'docker' in cgroup or 'containerd' in cgroup:
+        return 'docker'
+    return ''
+
+
 def systemd_unit(pid: int) -> str:
     """The unit name when the Host is systemd-managed, else an empty string."""
     try:
-        cgroup = open(f'/proc/{pid}/cgroup', encoding='utf-8').read()
+        cgroup = open(f'/proc/{pid}/cgroup', encoding='utf-8').read().strip()
     except OSError:
         return ''
-    for part in cgroup.split('/'):
-        if part.endswith('.service'):
-            return part
+    # Each line is `<id>::<path>`; the unit is the last path segment.
+    for line in cgroup.splitlines():
+        for part in line.split('/'):
+            if part.endswith('.service'):
+                return part.strip()
     return ''
 
 
@@ -272,8 +301,23 @@ def main() -> int:
     print(f'host pid={pid}\n  cwd={cwd}\n  argv={" ".join(argv)}', flush=True)
     print(f'  excluded sessions={sorted(exclude) or "<none>"}', flush=True)
     print(f'  busy sessions={sorted(running) or "<none>"} {unknown}', flush=True)
+    unit = systemd_unit(pid)
+    policy = systemd_policy(unit) if unit else ''
+    container = container_kind()
+    signal_name = 'SIGKILL' if policy in ('on-failure', 'on-abnormal', 'on-watchdog') else 'SIGTERM'
+    if unit:
+        action = f'systemd({unit}) policy={policy or "?"} → {signal_name}, systemd restarts'
+    elif container:
+        action = f'container({container}) → {signal_name}, the runtime restarts the container'
+    else:
+        action = 'no supervisor → daemonized respawn by this script'
+    print(f'  restart path={action}', flush=True)
+
     if args.check:
         return 3 if (running or unknown) else 0
+    if unit and policy == 'no':
+        log(f'restart: refused — {unit} has Restart=no; run `systemctl restart {unit}` as root')
+        return 4
     if args.dry_run:
         return 0
     if running or unknown:
@@ -306,8 +350,6 @@ def main() -> int:
     if not args.no_notify:
         log('restart: feishu notify ' + notify_feishu('🔁 DSH 即将重启，页面会短暂断连；重启完成后我会再发一条消息，刷新页面即可继续。'))
 
-    unit = systemd_unit(pid)
-
     # The fresh process sends the "back up" message: anything started here dies
     # with the Host's cgroup, so this script cannot outlive its own SIGTERM.
     marker = os.path.expanduser('~/.dsh/feishu-im/restart.pending')
@@ -318,14 +360,15 @@ def main() -> int:
     except OSError as error:
         log(f'restart: cannot write the marker ({error}); the new process will skip the notice')
 
-    log(f'restart: SIGTERM {pid}' + (f' (unit {unit})' if unit else ''))
+    log(f'restart: {signal_name} {pid}' + (f' (unit {unit})' if unit else ''))
     try:
-        os.kill(pid, signal.SIGTERM)
+        os.kill(pid, getattr(signal, signal_name))
     except ProcessLookupError:
         log('restart: host already gone')
 
-    if unit:
-        # systemd owns the restart; spawning a second host here would fight it.
+    if unit or container:
+        # systemd / the container runtime owns the restart; spawning a second
+        # host here would fight it and steal the port.
         for _ in range(60):
             if wait_gone(pid, 1.0):
                 log(f'restart: {unit} exited; waiting for systemd to start it again')
