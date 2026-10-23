@@ -13,7 +13,7 @@
   var API = '/api/feishu-im';
   // Bumped on every installed build: the page prints it, so a stale artifact is
   // visible instead of being mistaken for a code bug.
-  var BUILD = '1.9.2';
+  var BUILD = '1.9.3';
 
   var CSS = [
     '.fsim-page{display:flex;flex-direction:column;gap:20px;max-width:760px;color:var(--dsw-alias-label-primary,#1a1a1a);}',

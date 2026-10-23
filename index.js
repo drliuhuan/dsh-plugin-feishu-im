@@ -14,6 +14,7 @@
  */
 import { randomUUID } from 'node:crypto'
 import { appendFileSync, existsSync, mkdirSync } from 'node:fs'
+import { readFile, rm } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
@@ -75,6 +76,15 @@ function isSafeSchemaNode(node) {
 
 function isProviderSafeSchema(node) {
   return node !== null && typeof node === 'object' && node.type === 'object' && isSafeSchemaNode(node)
+}
+
+async function packageVersion() {
+  try {
+    const raw = await readFile(new URL('./package.json', import.meta.url), 'utf8')
+    return JSON.parse(raw).version
+  } catch {
+    return '?'
+  }
 }
 
 function normalizeToolSchema(node) {
@@ -473,6 +483,43 @@ export function apply(ctx) {
   // unload, and `ctx.effect` would run it in a forked scope whose event lineage
   // does not necessarily include the sessions being observed.
   ctx.on('session/event', (session, event) => notifier.onSessionEvent(session, event))
+
+  /*
+   * A restart started by scripts/restart-dsh.py kills the whole systemd cgroup,
+   * so the script cannot report its own success. It leaves a marker instead and
+   * the fresh process (this one) delivers the "back up" message.
+   */
+  const restartMarker = join(process.env.DSH_HOME || join(homedir(), '.dsh'), 'feishu-im', 'restart.pending')
+  void (async () => {
+    try {
+      const raw = await readFile(restartMarker, 'utf8')
+      await rm(restartMarker, { force: true })
+      const marker = JSON.parse(raw)
+      const age = Date.now() - (marker.requestedAt || 0)
+      if (!(age >= 0 && age < 10 * 60_000)) {
+        trace?.('restart-notice-stale', { age })
+        return
+      }
+      const state = await readState()
+      if (!state.appId || !state.appSecret) return
+      const chatId = state.homeChatId || Object.keys(state.chatSessions || {})[0]
+      if (!chatId) return
+      const token = await getTenantToken(state.appId, state.appSecret, state.domain)
+      const version = await packageVersion()
+      const seconds = Math.max(1, Math.round(age / 1000))
+      await sendText(token, state.domain, {
+        receiveId: chatId,
+        receiveIdType: 'chat_id',
+        text: `✅ DSH 已重启完成（插件 v${version}，约 ${seconds} 秒），刷新页面即可继续。`,
+      })
+      trace?.('restart-notice-sent', { version })
+    } catch (error) {
+      if (error?.code !== 'ENOENT') {
+        trace?.('restart-notice-failed', { message: String(error?.message || error) })
+        warn('restart notice failed:', error)
+      }
+    }
+  })()
   probe('listener-registered', { event: 'session/event' })
   ctx.effect(() => () => {
     answers.uninstall()

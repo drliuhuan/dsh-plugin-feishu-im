@@ -10,8 +10,10 @@ process restarts. This script does that safely:
   2. refuses to run while another session is mid-turn, and says which one;
   3. sends a Feishu message right before the kill and another once the new
      process is listening again;
-  4. SIGTERMs the Host (SIGKILL after a grace period), restarts the exact same
-     argv / cwd / environment, then waits for the port before reporting success.
+  4. SIGTERMs the Host and lets **systemd** bring it back (`Restart=always`,
+     `RestartSec=5`), because everything this script spawns lives in the Host's
+     cgroup and dies with it. It leaves a marker so the fresh process can send
+     the "back up" message itself.
 
 Usage:
   python3 scripts/restart-dsh.py --delay 30          # the normal call
@@ -206,6 +208,18 @@ def plugin_version() -> str:
         return '?'
 
 
+def systemd_unit(pid: int) -> str:
+    """The unit name when the Host is systemd-managed, else an empty string."""
+    try:
+        cgroup = open(f'/proc/{pid}/cgroup', encoding='utf-8').read()
+    except OSError:
+        return ''
+    for part in cgroup.split('/'):
+        if part.endswith('.service'):
+            return part
+    return ''
+
+
 def wait_gone(pid: int, seconds: float) -> bool:
     deadline = time.time() + seconds
     while time.time() < deadline:
@@ -292,19 +306,45 @@ def main() -> int:
     if not args.no_notify:
         log('restart: feishu notify ' + notify_feishu('🔁 DSH 即将重启，页面会短暂断连；重启完成后我会再发一条消息，刷新页面即可继续。'))
 
-    log(f'restart: SIGTERM {pid}')
+    unit = systemd_unit(pid)
+
+    # The fresh process sends the "back up" message: anything started here dies
+    # with the Host's cgroup, so this script cannot outlive its own SIGTERM.
+    marker = os.path.expanduser('~/.dsh/feishu-im/restart.pending')
+    try:
+        os.makedirs(os.path.dirname(marker), exist_ok=True)
+        with open(marker, 'w', encoding='utf-8') as handle:
+            json.dump({'requestedAt': int(time.time() * 1000), 'pid': pid, 'unit': unit}, handle)
+    except OSError as error:
+        log(f'restart: cannot write the marker ({error}); the new process will skip the notice')
+
+    log(f'restart: SIGTERM {pid}' + (f' (unit {unit})' if unit else ''))
     try:
         os.kill(pid, signal.SIGTERM)
     except ProcessLookupError:
-        log('restart: host already gone; starting a new one')
-    if not wait_gone(pid, 15.0):
+        log('restart: host already gone')
+
+    if unit:
+        # systemd owns the restart; spawning a second host here would fight it.
+        for _ in range(60):
+            if wait_gone(pid, 1.0):
+                log(f'restart: {unit} exited; waiting for systemd to start it again')
+                for _ in range(90):
+                    time.sleep(1.0)
+                    if listener_up():
+                        log(f'restart: listener is back on {PORT}')
+                        return 0
+                log(f'restart: WARNING {unit} did not come back on {PORT} within 90s')
+                return 1
         log(f'restart: SIGKILL {pid}')
         try:
             os.kill(pid, signal.SIGKILL)
         except ProcessLookupError:
             pass
-        wait_gone(pid, 5.0)
+        return 1
 
+    # Not systemd-managed: start the replacement ourselves.
+    wait_gone(pid, 15.0)
     time.sleep(1.5)
     os.chdir(cwd)
     try:
@@ -329,12 +369,7 @@ def main() -> int:
     for _ in range(90):
         time.sleep(1.0)
         if listener_up():
-            version = plugin_version()
-            log(f'restart: listener is back on {PORT} (plugin v{version})')
-            if not args.no_notify:
-                log('restart: feishu notify ' + notify_feishu(
-                    f'✅ DSH 已重启完成（插件 v{version}），刷新页面即可继续。'
-                ))
+            log(f'restart: listener is back on {PORT} (plugin v{plugin_version()})')
             return 0
     log(f'restart: WARNING no listener on {PORT} after 90s')
     if not args.no_notify:
