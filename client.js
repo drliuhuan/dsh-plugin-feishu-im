@@ -13,7 +13,7 @@
   var API = '/api/feishu-im';
   // Bumped on every installed build: the page prints it, so a stale artifact is
   // visible instead of being mistaken for a code bug.
-  var BUILD = '1.14.1';
+  var BUILD = '1.14.2';
 
   // Kept in sync with lib/permissions.js; the Host validates whatever is saved.
   var PERMISSION_ORDER = ['readonly', 'workspace', 'auto', 'full'];

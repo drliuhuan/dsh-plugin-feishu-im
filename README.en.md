@@ -128,8 +128,9 @@ Tap an option to answer inline, or tap **✏️ Type your answer** and send the 
 
 ![Session list](./docs/screenshots/08-session-list.gif)
 
-`/sessions [keyword]` (alias `/history`) posts a numbered list card; tap a number to switch, or use
-`/resume <n|id|title>`. The card is rewritten in place to show only the bound session title afterwards. Sub-agent
+`/sessions [keyword]` (alias `/history`) posts up to ten buttons, each labelled **title · last interaction**
+(“fix CI · 2 hours ago”); tap one to switch. The card body no longer repeats the titles and only points at
+`/sessions <keyword>` for searching. `/resume <n|id|title>` still works. The card is rewritten in place to show only the bound session title afterwards. Sub-agent
 sessions are filtered out and the current binding is marked `← current`.
 
 | Command | Purpose |
