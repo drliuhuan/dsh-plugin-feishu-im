@@ -35,7 +35,8 @@ const summaries = [
 
 const ctx = {
   get: (name) => {
-    if (name === 'sessionController') return { list: async () => summaries }
+    // Mirrors the live service: the list is wrapped, not a bare array.
+    if (name === 'sessionController') return { list: async () => ({ items: summaries }) }
     if (name === 'workspaceRegistry') return { list: () => [{ path: '/home/me/work/alpha', title: '工作区 Alpha' }] }
     return undefined
   },
