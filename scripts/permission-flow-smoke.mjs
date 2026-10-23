@@ -40,6 +40,9 @@ const first = await answers.handleCardAction({
 })
 assert.ok(first?.toast, 'selection returns a toast')
 assert.match(first.toast.content, /确认/, 'selection asks for confirmation')
+// The response itself replaces the clicked card (no message id needed).
+assert.equal(first.card?.type, 'raw', 'selection returns the rewritten picker card')
+assert.equal(first.card.data.elements.some((el) => el.tag === 'action'), false, 'no buttons in the replacement')
 assert.equal(state.chatPermissions.oc_1, undefined, 'selection alone must not change the mode')
 assert.ok(
   patched.some((entry) => entry.messageId === 'om_picker' && !entry.element.elements.some((el) => el.tag === 'action')),
